@@ -22,9 +22,9 @@ private func hotKeyHandler(nextHandler: EventHandlerCallRef?, event: EventRef?, 
     
     DispatchQueue.main.async {
         switch hotKeyID.id {
-        case 1: // 右矢印（次の画面）
+        case 1: // 右矢印(次の画面)
             appDelegate.moveWindowToNextScreen()
-        case 2: // 左矢印（前の画面）
+        case 2: // 左矢印(前の画面)
             appDelegate.moveWindowToPrevScreen()
         default:
             break
@@ -34,6 +34,79 @@ private func hotKeyHandler(nextHandler: EventHandlerCallRef?, event: EventRef?, 
     return noErr
 }
 
+// デバッグログを保存するクラス
+class DebugLogger {
+    static let shared = DebugLogger()
+    private var logs: [String] = []
+    private let maxLogs = 1000
+    
+    func addLog(_ message: String) {
+        let timestamp = DateFormatter.localizedString(from: Date(), dateStyle: .none, timeStyle: .medium)
+        let logEntry = "[\(timestamp)] \(message)"
+        logs.append(logEntry)
+        
+        // ログが多すぎる場合は古いものを削除
+        if logs.count > maxLogs {
+            logs.removeFirst(logs.count - maxLogs)
+        }
+    }
+    
+    func getAllLogs() -> String {
+        return logs.joined(separator: "\n")
+    }
+    
+    func clearLogs() {
+        logs.removeAll()
+    }
+}
+
+// デバッグログ表示用のSwiftUIビュー
+struct DebugLogView: View {
+    @State private var logs: String
+    @Environment(\.dismiss) private var dismiss
+    
+    init() {
+        _logs = State(initialValue: DebugLogger.shared.getAllLogs())
+    }
+    
+    var body: some View {
+        VStack(spacing: 0) {
+            // ヘッダー
+            HStack {
+                Text("デバッグログ")
+                    .font(.headline)
+                Spacer()
+                Button("クリア") {
+                    DebugLogger.shared.clearLogs()
+                    logs = DebugLogger.shared.getAllLogs()
+                }
+                .disabled(logs.isEmpty)
+                Button("コピー") {
+                    NSPasteboard.general.clearContents()
+                    NSPasteboard.general.setString(logs, forType: .string)
+                }
+                .disabled(logs.isEmpty)
+                Button("閉じる") {
+                    dismiss()
+                }
+            }
+            .padding()
+            
+            Divider()
+            
+            // ログ表示エリア
+            ScrollView {
+                Text(logs.isEmpty ? "ログがありません" : logs)
+                    .font(.system(.body, design: .monospaced))
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .padding()
+                    .textSelection(.enabled)
+            }
+        }
+        .frame(width: 700, height: 500)
+    }
+}
+
 class AppDelegate: NSObject, NSApplicationDelegate {
     var statusItem: NSStatusItem?
     var hotKeyRef: EventHotKeyRef?
@@ -41,6 +114,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     var eventHandler: EventHandlerRef?
     var settingsWindow: NSWindow?
     var aboutWindow: NSWindow?
+    var debugWindow: NSWindow?
     
     // ディスプレイ記憶機能
     private var windowPositions: [String: [String: CGRect]] = [:]
@@ -70,7 +144,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // ディスプレイ変更の監視を開始
         setupDisplayChangeObserver()
         
-        // 定期スナップショットを開始（5秒ごと）
+        // 定期スナップショットを開始(5秒ごと)
         startPeriodicSnapshot()
         
         debugPrint("アプリが起動しました")
@@ -84,8 +158,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(NSMenuItem(title: "ウィンドウを次の画面へ (\(modifierString)→)", action: #selector(moveWindowToNextScreen), keyEquivalent: ""))
         menu.addItem(NSMenuItem(title: "ウィンドウを前の画面へ (\(modifierString)←)", action: #selector(moveWindowToPrevScreen), keyEquivalent: ""))
         menu.addItem(NSMenuItem.separator())
-        menu.addItem(NSMenuItem(title: "ショートカット設定...", action: #selector(openSettings), keyEquivalent: ","))
-        menu.addItem(NSMenuItem(title: "デバッグ情報を表示", action: #selector(showDebugInfo), keyEquivalent: "d"))
+        menu.addItem(NSMenuItem(title: "設定...", action: #selector(openSettings), keyEquivalent: ","))
+        menu.addItem(NSMenuItem(title: "デバッグログを表示", action: #selector(showDebugLog), keyEquivalent: "d"))
         menu.addItem(NSMenuItem.separator())
         menu.addItem(NSMenuItem(title: "About WindowSmartMover", action: #selector(openAbout), keyEquivalent: ""))
         menu.addItem(NSMenuItem.separator())
@@ -130,6 +204,28 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         NSApp.activate(ignoringOtherApps: true)
     }
     
+    @objc func showDebugLog() {
+        let debugView = DebugLogView()
+        let hostingController = NSHostingController(rootView: debugView)
+        
+        if debugWindow == nil {
+            let window = NSWindow(contentViewController: hostingController)
+            window.title = "デバッグログ"
+            window.styleMask = [.titled, .closable, .resizable]
+            window.center()
+            window.level = .floating
+            window.setContentSize(NSSize(width: 700, height: 500))
+            
+            debugWindow = window
+        } else {
+            // 既存のウィンドウがある場合は内容を更新
+            debugWindow?.contentViewController = hostingController
+        }
+        
+        debugWindow?.makeKeyAndOrderFront(nil)
+        NSApp.activate(ignoringOtherApps: true)
+    }
+    
     func registerHotKeys() {
         // 既存のホットキーを解除
         if let hotKey = hotKeyRef {
@@ -144,7 +240,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // イベントタイプの指定
         var eventType = EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyPressed))
         
-        // イベントハンドラをインストール（初回のみ）
+        // イベントハンドラをインストール(初回のみ)
         if eventHandler == nil {
             let status = InstallEventHandler(GetApplicationEventTarget(), hotKeyHandler, 1, &eventType, nil, &eventHandler)
             
@@ -202,219 +298,149 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         debugPrint("フロントアプリ: \(frontmostApp.localizedName ?? "不明")")
         
-        let options = CGWindowListOption(arrayLiteral: .excludeDesktopElements, .optionOnScreenOnly)
-        let windowList = CGWindowListCopyWindowInfo(options, kCGNullWindowID) as? [[String: Any]]
+        let pid = frontmostApp.processIdentifier
+        let appRef = AXUIElementCreateApplication(pid)
         
-        // フロントアプリのメインウィンドウを探す
-        guard let windows = windowList,
-              let targetWindow = windows.first(where: { window in
-                  guard let ownerPID = window[kCGWindowOwnerPID as String] as? Int32,
-                        ownerPID == frontmostApp.processIdentifier,
-                        let layer = window[kCGWindowLayer as String] as? Int,
-                        layer == 0 else { return false }
-                  return true
-              }),
-              let boundsDict = targetWindow[kCGWindowBounds as String] as? [String: CGFloat]
-        else {
-            debugPrint("❌ ターゲットウィンドウが見つかりませんでした")
+        var focusedWindowRef: CFTypeRef?
+        let result = AXUIElementCopyAttributeValue(appRef, kAXFocusedWindowAttribute as CFString, &focusedWindowRef)
+        
+        guard result == .success, let focusedWindow = focusedWindowRef else {
+            debugPrint("❌ フォーカスされたウィンドウがありません")
             return
         }
         
-        let currentFrame = CGRect(
-            x: boundsDict["X"] ?? 0,
-            y: boundsDict["Y"] ?? 0,
-            width: boundsDict["Width"] ?? 0,
-            height: boundsDict["Height"] ?? 0
-        )
+        debugPrint("✅ フォーカスされたウィンドウを取得しました")
         
-        debugPrint("現在のウィンドウ位置: \(currentFrame)")
+        // ウィンドウの現在の位置とサイズを取得
+        var positionRef: CFTypeRef?
+        var sizeRef: CFTypeRef?
         
-        // 現在のウィンドウがある画面を特定
+        guard AXUIElementCopyAttributeValue(focusedWindow as! AXUIElement, kAXPositionAttribute as CFString, &positionRef) == .success,
+              AXUIElementCopyAttributeValue(focusedWindow as! AXUIElement, kAXSizeAttribute as CFString, &sizeRef) == .success else {
+            debugPrint("❌ ウィンドウの位置またはサイズを取得できませんでした")
+            return
+        }
+        
+        var position = CGPoint.zero
+        var size = CGSize.zero
+        
+        guard let positionValue = positionRef, let sizeValue = sizeRef,
+              AXValueGetValue(positionValue as! AXValue, .cgPoint, &position),
+              AXValueGetValue(sizeValue as! AXValue, .cgSize, &size) else {
+            debugPrint("❌ 位置やサイズの値を取得できませんでした")
+            return
+        }
+        
+        debugPrint("現在のウィンドウ位置: \(position), サイズ: \(size)")
+        
         let screens = NSScreen.screens
-        guard let currentScreenIndex = screens.firstIndex(where: { screen in
-            screen.frame.intersects(currentFrame)
-        }) else {
-            debugPrint("❌ 現在の画面を特定できませんでした")
+        debugPrint("利用可能な画面数: \(screens.count)")
+        
+        guard screens.count > 1 else {
+            debugPrint("❌ 画面が1つしかありません")
             return
         }
         
-        debugPrint("現在の画面インデックス: \(currentScreenIndex)")
+        // 現在のウィンドウがどの画面にあるかを判定
+        var currentScreenIndex = 0
+        for (index, screen) in screens.enumerated() {
+            if screen.frame.contains(position) {
+                currentScreenIndex = index
+                debugPrint("現在の画面インデックス: \(index)")
+                break
+            }
+        }
         
-        // 次の画面を計算
-        let nextScreenIndex = (currentScreenIndex + direction + screens.count) % screens.count
-        let targetScreen = screens[nextScreenIndex]
+        // 次の画面のインデックスを計算
+        var nextScreenIndex = (currentScreenIndex + direction + screens.count) % screens.count
+        debugPrint("次の画面インデックス: \(nextScreenIndex)")
         
-        debugPrint("移動先画面インデックス: \(nextScreenIndex)")
-        debugPrint("移動先画面のフレーム: \(targetScreen.frame)")
+        let currentScreen = screens[currentScreenIndex]
+        let nextScreen = screens[nextScreenIndex]
         
         // ウィンドウの相対位置を維持して移動
-        let currentScreen = screens[currentScreenIndex]
-        let relativeX = currentFrame.origin.x - currentScreen.frame.origin.x
-        let relativeY = currentFrame.origin.y - currentScreen.frame.origin.y
+        let relativeX = position.x - currentScreen.frame.origin.x
+        let relativeY = position.y - currentScreen.frame.origin.y
         
-        let newX = targetScreen.frame.origin.x + relativeX
-        let newY = targetScreen.frame.origin.y + relativeY
+        let newX = nextScreen.frame.origin.x + relativeX
+        let newY = nextScreen.frame.origin.y + relativeY
+        var newPosition = CGPoint(x: newX, y: newY)
         
-        debugPrint("新しい位置: x=\(newX), y=\(newY)")
+        debugPrint("新しい位置: \(newPosition)")
         
-        // Accessibility APIを使用してウィンドウを移動
-        let appRef = AXUIElementCreateApplication(frontmostApp.processIdentifier)
-        
-        // まずフォーカスウィンドウを試す
-        var value: CFTypeRef?
-        var result = AXUIElementCopyAttributeValue(appRef, kAXFocusedWindowAttribute as CFString, &value)
-        
-        // フォーカスウィンドウが取得できない場合は、全ウィンドウリストから取得
-        if result != .success {
-            var windowList: CFTypeRef?
-            result = AXUIElementCopyAttributeValue(appRef, kAXWindowsAttribute as CFString, &windowList)
+        // ウィンドウを移動
+        if let positionValue = AXValueCreate(.cgPoint, &newPosition) {
+            let setResult = AXUIElementSetAttributeValue(focusedWindow as! AXUIElement, kAXPositionAttribute as CFString, positionValue)
             
-            if result == .success, let windows = windowList as? [AXUIElement], !windows.isEmpty {
-                value = windows[0]
-                result = .success
+            if setResult == .success {
+                debugPrint("✅ ウィンドウの移動に成功しました")
+            } else {
+                debugPrint("❌ ウィンドウの移動に失敗しました: \(setResult.rawValue)")
             }
         }
-        
-        if result == .success, let windowElement = value {
-            // 現在の位置を確認
-            var currentPos: CFTypeRef?
-            if AXUIElementCopyAttributeValue(windowElement as! AXUIElement, kAXPositionAttribute as CFString, &currentPos) == .success {
-                var point = CGPoint.zero
-                if AXValueGetValue(currentPos as! AXValue, .cgPoint, &point) {
-                    debugPrint("現在のAX位置: \(point)")
-                }
-            }
-            
-            // 新しい位置を設定
-            var position = CGPoint(x: newX, y: newY)
-            
-            if let positionValue = AXValueCreate(.cgPoint, &position) {
-                let setResult = AXUIElementSetAttributeValue(windowElement as! AXUIElement, kAXPositionAttribute as CFString, positionValue)
-                
-                if setResult == .success {
-                    debugPrint("✅ ウィンドウの移動に成功しました")
-                } else {
-                    debugPrint("❌ ウィンドウの移動に失敗: \(setResult.rawValue)")
-                }
-            }
-        }
-    }
-    
-    @objc func showDebugInfo() {
-        debugPrint("\n=== デバッグ情報 ===")
-        debugPrint("接続されている画面数: \(NSScreen.screens.count)")
-        
-        for (index, screen) in NSScreen.screens.enumerated() {
-            debugPrint("画面 \(index): \(screen.frame)")
-            let name = screen.localizedName
-            debugPrint("  名前: \(name)")
-        }
-        
-        if let frontmostApp = NSWorkspace.shared.frontmostApplication {
-            debugPrint("現在のフロントアプリ: \(frontmostApp.localizedName ?? "不明")")
-        }
-        
-        debugPrint("アクセシビリティ権限: \(AXIsProcessTrusted())")
-        debugPrint("現在のショートカット: \(HotKeySettings.shared.getModifierString())← / →")
-        debugPrint("===================\n")
     }
     
     func checkAccessibilityPermissions() {
-        let trusted = AXIsProcessTrusted()
-        if !trusted {
-            debugPrint("⚠️ アクセシビリティ権限が必要です")
-            
-            let alert = NSAlert()
-            alert.messageText = "アクセシビリティ権限が必要です"
-            alert.informativeText = "このアプリはウィンドウを移動するためにアクセシビリティ権限が必要です。\n\nシステム設定 > プライバシーとセキュリティ > アクセシビリティ\nでこのアプリを許可してください。"
-            alert.alertStyle = .warning
-            alert.addButton(withTitle: "システム設定を開く")
-            alert.addButton(withTitle: "あとで")
-            
-            if alert.runModal() == .alertFirstButtonReturn {
-                if let url = URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_Accessibility") {
-                    NSWorkspace.shared.open(url)
-                }
-            }
-        } else {
+        let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true]
+        let accessEnabled = AXIsProcessTrustedWithOptions(options as CFDictionary)
+        
+        if accessEnabled {
             debugPrint("✅ アクセシビリティ権限が付与されています")
+        } else {
+            debugPrint("⚠️ アクセシビリティ権限が必要です")
         }
     }
     
-    func debugPrint(_ message: String) {
-        let timestamp = DateFormatter.localizedString(from: Date(), dateStyle: .none, timeStyle: .medium)
-        print("[\(timestamp)] \(message)")
-    }
-    
-    // MARK: - ディスプレイ記憶機能（定期スナップショット方式）
-    
-    /// 定期スナップショットを開始
-    private func startPeriodicSnapshot() {
-        // 初回は即座に実行
-        saveAllWindowPositions()
-        
-        // 5秒ごとに保存
-        snapshotTimer = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: true) { [weak self] _ in
-            self?.saveAllWindowPositions()
-        }
-        
-        debugPrint("✅ 定期スナップショット（5秒間隔）を開始しました")
-    }
-    
-    /// ディスプレイ変更の監視を開始
+    // ディスプレイ変更を監視
     private func setupDisplayChangeObserver() {
         NotificationCenter.default.addObserver(
             self,
-            selector: #selector(screenParametersDidChange),
+            selector: #selector(displayConfigurationChanged),
             name: NSApplication.didChangeScreenParametersNotification,
             object: nil
         )
         debugPrint("✅ ディスプレイ変更の監視を開始しました")
     }
     
-    /// ディスプレイ構成が変更された時の処理
-    @objc private func screenParametersDidChange(_ notification: Notification) {
-        debugPrint("\n=== ディスプレイ構成が変更されました ===")
+    @objc private func displayConfigurationChanged() {
+        debugPrint("🖥️ ディスプレイ構成が変更されました")
+        debugPrint("現在の画面数: \(NSScreen.screens.count)")
         
-        let currentScreens = NSScreen.screens
-        debugPrint("現在の画面数: \(currentScreens.count)")
+        // 設定から遅延時間を取得
+        let delay = WindowTimingSettings.shared.windowRestoreDelay
+        debugPrint("ウィンドウ復元遅延: \(delay)秒")
         
-        for (index, screen) in currentScreens.enumerated() {
-            let id = getDisplayIdentifier(for: screen)
-            debugPrint("  画面\(index): \(id)")
-        }
-        
-        // 少し待ってから復元処理を実行（画面が安定するまで）
-        DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
-            self.restoreWindowsIfNeeded()
+        // 少し待ってからウィンドウを復元(ディスプレイの初期化を待つ)
+        DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
+            self?.restoreWindowsIfNeeded()
         }
     }
     
-    /// ディスプレイの識別子を生成（名前+解像度）
+    /// 定期的にウィンドウ位置のスナップショットを取る
+    private func startPeriodicSnapshot() {
+        snapshotTimer = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: true) { [weak self] _ in
+            self?.snapshotAllWindows()
+        }
+        debugPrint("✅ 定期スナップショットを開始しました(5秒間隔)")
+    }
+    
+    /// ディスプレイの一意な識別子を取得
     private func getDisplayIdentifier(for screen: NSScreen) -> String {
-        var name = screen.localizedName
-        
-        // localizedNameが空の場合の対処
-        if name.isEmpty {
-            if let screenNumber = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? NSNumber {
-                name = "Display\(screenNumber)"
-            } else {
-                name = "UnknownDisplay"
-            }
+        // NSScreenのデバイス記述から識別子を生成
+        if let screenNumber = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? CGDirectDisplayID {
+            return "\(screenNumber)"
         }
-        
-        let width = Int(screen.frame.width)
-        let height = Int(screen.frame.height)
-        return "\(name)_\(width)x\(height)"
+        // フォールバック: フレーム情報から生成
+        return "\(screen.frame.origin.x)_\(screen.frame.origin.y)"
     }
     
-    /// ウィンドウの識別子を生成（アプリ名+CGWindowID）
+    /// ウィンドウの一意な識別子を生成
     private func getWindowIdentifier(appName: String, windowID: CGWindowID) -> String {
         return "\(appName)_\(windowID)"
     }
     
-    /// 全ウィンドウの位置を保存（定期実行）
-    private func saveAllWindowPositions() {
+    /// 全ウィンドウの位置をスナップショット
+    private func snapshotAllWindows() {
         let options = CGWindowListOption(arrayLiteral: .excludeDesktopElements, .optionOnScreenOnly)
         guard let windowList = CGWindowListCopyWindowInfo(options, kCGNullWindowID) as? [[String: Any]] else {
             return
@@ -558,7 +584,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                     
                     // メイン画面にあるウィンドウのみを復元対象とする
                     if !mainScreen.frame.intersects(currentFrame) {
-                        debugPrint("      ❌ メイン画面にない（スキップ）")
+                        debugPrint("      ❌ メイン画面にない(スキップ)")
                         continue
                     }
                     
@@ -619,4 +645,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // タイマーの停止
         snapshotTimer?.invalidate()
     }
+}
+
+// debugPrint関数の実装
+func debugPrint(_ message: String) {
+    print(message)
+    DebugLogger.shared.addLog(message)
 }
