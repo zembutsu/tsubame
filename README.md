@@ -30,6 +30,25 @@ A lightweight macOS menu bar app for effortless window management across multipl
 - **Sleep/Wake Support**: Works seamlessly after waking from sleep
 - **Multi-Window Support**: Handles multiple windows per app individually
 
+### Coming Soon (v1.2.0 - In Development) 🚧
+
+⚠️ **Note**: These features are under active development and not yet available in stable releases.
+
+- **Debug Log Viewer**: Real-time logging for troubleshooting
+  - View all system events and window operations
+  - Copy logs to clipboard for issue reporting
+  - Clear logs on demand
+  - Memory-only storage (no disk writes)
+- **Configurable Window Restore Timing**: Fine-tune display reconnection behavior
+  - Adjustable delay from 0.1 to 10.0 seconds (default: 1.5s)
+  - Helps with displays that need extra stabilization time
+  - Per-user customization in Settings dialog
+- **Enhanced Settings Dialog**: Unified configuration interface
+  - Combined hotkey and timing settings
+  - One-click reset to defaults
+
+For detailed development progress, see [CHANGELOG.md](CHANGELOG.md).
+
 ## Why WindowSmartMover?
 
 ### The Problem with Existing Solutions
@@ -93,9 +112,26 @@ This project embodies the philosophy: **understand deeply by building yourself**
 
 ### Customizing Hotkeys
 1. Click the menu bar icon
-2. Select "Keyboard Shortcut Settings..."
+2. Select "Settings..."
 3. Choose your preferred modifier keys
 4. Restart the app
+
+### Debug Log Viewer (v1.2.0+) 🚧
+> **Note**: This feature is in development. Available in v1.2.0-beta and later.
+
+1. Click the menu bar icon
+2. Select "Show Debug Log"
+3. View real-time logs of window operations
+4. Use "Copy" to save logs for issue reporting
+5. Use "Clear" to reset the log buffer
+
+### Configuring Window Restore Timing (v1.2.0+) 🚧
+> **Note**: This feature is in development. Available in v1.2.0-beta and later.
+
+1. Click the menu bar icon
+2. Select "Settings..."
+3. Adjust "Window Restore Delay" slider (0.1-10.0 seconds)
+4. Changes take effect immediately on next display reconnection
 
 ## Building from Source
 
@@ -152,17 +188,42 @@ open WindowSmartMover.xcodeproj
 - Some apps don't support programmatic window control
 
 ### Automatic restoration not working
-- Check Console logs (click menu bar icon → "Show Debug Info")
+- **(v1.2.0+)** Check debug logs: Menu bar icon → "Show Debug Log" 🚧
 - Ensure external display is properly detected
 - Try manual window movement first to verify permissions
+- Adjust window restore timing if displays need more stabilization time
+
+### Using Debug Logs (v1.2.0+) 🚧
+> **Note**: Debug log feature is available in v1.2.0-beta and later.
+
+The debug log viewer helps diagnose issues:
+1. Reproduce the problem
+2. Open debug logs (Menu bar → "Show Debug Log")
+3. Copy logs using the "Copy" button
+4. Share logs when reporting issues on GitHub
+
+**Privacy Note**: Debug logs are stored in memory only and contain:
+- Display IDs (numeric identifiers, no personal info)
+- Application names
+- Window coordinates
+- System events
+
+No sensitive information is logged or transmitted.
 
 ## Roadmap
 
-- [ ] Per-display restoration timing configuration
-- [ ] Optional: Disable verbose logging in release builds
+### In Development (v1.2.0)
+- [x] Debug log viewer
+- [x] Configurable window restore timing
+- [ ] Internationalization (English UI + Japanese localization)
+
+### Future Considerations
 - [ ] Window size restoration (currently position only)
 - [ ] Support for more than 2 displays
 - [ ] Preferences for snapshot interval
+- [ ] Per-app window restoration rules
+
+For detailed development plans, see [CHANGELOG.md](CHANGELOG.md).
 
 ## Contributing
 
