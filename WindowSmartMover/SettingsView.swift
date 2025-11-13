@@ -195,6 +195,6 @@ struct SettingsView: View {
             .padding(.bottom)
         }
         .padding()
-        .frame(width: 500, height: 650)
+        .frame(width: 500, height: 715)
     }
 }
