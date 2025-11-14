@@ -123,6 +123,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     // ディスプレイ変更の落ち着き待ちタイマー
     private var displayStabilizationTimer: Timer?
     
+    // 復元処理のワークアイテム（キャンセル可能）
+    private var restoreWorkItem: DispatchWorkItem?
+    
     func applicationDidFinishLaunching(_ notification: Notification) {
         // グローバル参照を設定
         globalAppDelegate = self
@@ -409,24 +412,24 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         debugPrint("🖥️ ディスプレイ構成が変更されました")
         debugPrint("現在の画面数: \(NSScreen.screens.count)")
         
-        // 既存の落ち着き待ちタイマーをキャンセル
-        displayStabilizationTimer?.invalidate()
+        // 既存の復元処理をキャンセル
+        restoreWorkItem?.cancel()
         
         // 設定から遅延時間を取得
         let stabilizationDelay = WindowTimingSettings.shared.displayStabilizationDelay
+        let restoreDelay = WindowTimingSettings.shared.windowRestoreDelay
+        let totalDelay = stabilizationDelay + restoreDelay
         
-        // ディスプレイ変更が落ち着くまで待つ(連続イベント対策)
-        displayStabilizationTimer = Timer.scheduledTimer(withTimeInterval: stabilizationDelay, repeats: false) { [weak self] _ in
-            debugPrint("✅ ディスプレイ変更が落ち着きました(待機: \(stabilizationDelay)秒)")
-            
-            // さらにmacOSがウィンドウ座標を更新し終わるまで待つ
-            let restoreDelay = WindowTimingSettings.shared.windowRestoreDelay
-            debugPrint("ウィンドウ復元遅延: \(restoreDelay)秒")
-            
-            DispatchQueue.main.asyncAfter(deadline: .now() + restoreDelay) { [weak self] in
-                self?.restoreWindowsIfNeeded()
-            }
+        debugPrint("復元まで \(totalDelay)秒待機（安定化:\(stabilizationDelay)秒 + 復元:\(restoreDelay)秒）")
+        
+        // 新しい復元処理を作成
+        let workItem = DispatchWorkItem { [weak self] in
+            self?.restoreWindowsIfNeeded()
         }
+        
+        // 保存してスケジュール
+        restoreWorkItem = workItem
+        DispatchQueue.main.asyncAfter(deadline: .now() + totalDelay, execute: workItem)
     }
     
     /// 定期的にウィンドウ位置のスナップショットを取る

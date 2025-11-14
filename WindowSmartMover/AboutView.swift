@@ -17,6 +17,14 @@ struct AboutView: View {
         Bundle.main.infoDictionary?["CFBundleVersion"] as? String ?? "1"
     }
     
+    private var currentDateTime: String {
+        let formatter = DateFormatter()
+        formatter.dateStyle = .medium
+        formatter.timeStyle = .medium
+        formatter.locale = Locale(identifier: "ja_JP")
+        return formatter.string(from: Date())
+    }
+    
     private var appName: String {
         Bundle.main.infoDictionary?["CFBundleName"] as? String ?? "WindowSmartMover"
     }
@@ -51,6 +59,14 @@ struct AboutView: View {
                     Text(buildNumber)
                         .fontWeight(.semibold)
                 }
+                
+                HStack {
+                    Text("ビルド時刻:")
+                        .foregroundColor(.secondary)
+                    Text(currentDateTime)
+                        .fontWeight(.semibold)
+                        .font(.caption)
+                }
             }
             .padding()
             .background(Color.gray.opacity(0.1))
@@ -78,6 +94,6 @@ struct AboutView: View {
             .keyboardShortcut(.defaultAction)
             .padding(.bottom)
         }
-        .frame(width: 350, height: 400)
+        .frame(width: 350, height: 420)
     }
 }

@@ -66,10 +66,10 @@ class WindowTimingSettings: ObservableObject {
     }
     
     private init() {
-        // デフォルト値: ディスプレイ接続後の待機時間は2.5秒
-        self.windowRestoreDelay = defaults.object(forKey: windowDelayKey) as? Double ?? 2.5
-        // デフォルト値: ディスプレイ変更の落ち着き待ち時間は0.5秒
-        self.displayStabilizationDelay = defaults.object(forKey: displayStabilizationKey) as? Double ?? 0.5
+        // デフォルト値: ディスプレイ接続後の待機時間は6.0秒
+        self.windowRestoreDelay = defaults.object(forKey: windowDelayKey) as? Double ?? 6.0
+        // デフォルト値: ディスプレイ変更の落ち着き待ち時間は6.0秒
+        self.displayStabilizationDelay = defaults.object(forKey: displayStabilizationKey) as? Double ?? 6.0
     }
 }
 
@@ -137,7 +137,7 @@ struct SettingsView: View {
                             .fontWeight(.semibold)
                     }
                     
-                    Slider(value: $timingSettings.displayStabilizationDelay, in: 0.1...3.0, step: 0.1)
+                    Slider(value: $timingSettings.displayStabilizationDelay, in: 0.1...15.0, step: 0.1)
                     
                     Text("サスペンド復帰時など、ディスプレイ変更イベントが連続して発生した際に、変更が落ち着くまで待つ時間です。復元処理が早すぎる場合は、この値を大きくしてください。")
                         .font(.caption)
@@ -159,7 +159,7 @@ struct SettingsView: View {
                             .fontWeight(.semibold)
                     }
                     
-                    Slider(value: $timingSettings.windowRestoreDelay, in: 0.1...10.0, step: 0.1)
+                    Slider(value: $timingSettings.windowRestoreDelay, in: 0.1...15.0, step: 0.1)
                     
                     Text("外部ディスプレイを接続した際に、macOSがウィンドウ座標を更新し終わるまでの待機時間です。ウィンドウが正しく復元されない場合は、この値を大きくしてください。")
                         .font(.caption)
@@ -181,8 +181,8 @@ struct SettingsView: View {
                     settings.useOption = true
                     settings.useShift = false
                     settings.useCommand = true
-                    timingSettings.displayStabilizationDelay = 0.5
-                    timingSettings.windowRestoreDelay = 2.5
+                    timingSettings.displayStabilizationDelay = 6.0
+                    timingSettings.windowRestoreDelay = 6.0
                 }
                 
                 Spacer()
