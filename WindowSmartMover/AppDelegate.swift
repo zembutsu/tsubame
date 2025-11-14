@@ -149,6 +149,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         // ディスプレイ変更の監視を開始
         setupDisplayChangeObserver()
+        setupSleepWakeObserver()
         
         // 定期スナップショットを開始(5秒ごと)
         startPeriodicSnapshot()
@@ -648,6 +649,29 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         debugPrint("✅ 合計 \(restoredCount)個のウィンドウを復元しました\n")
     }
+    
+    // スリープ/ウェイク通知の監視
+    private func setupSleepWakeObserver() {
+        NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.willSleepNotification,
+            object: nil,
+            queue: .main
+        ) { _ in
+            debugPrint("💤 System going to sleep")
+        }
+        
+        NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.didWakeNotification,
+            object: nil,
+            queue: .main
+        ) { _ in
+            debugPrint("☀️ System woke from sleep")
+        }
+        
+        debugPrint("✅ Sleep/wake monitoring started")
+    }
+    
+    
     
     deinit {
         // ホットキーの登録解除
