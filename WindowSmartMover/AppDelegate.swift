@@ -126,6 +126,21 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     // 復元処理のワークアイテム（キャンセル可能）
     private var restoreWorkItem: DispatchWorkItem?
     
+    // ディスプレイ監視の有効/無効状態
+    private var isDisplayMonitoringEnabled = true
+    
+    // 最後のディスプレイ変更時刻（安定化検知用）
+    private var lastDisplayChangeTime: Date?
+    
+    // 安定化確認タイマー
+    private var stabilizationCheckTimer: Timer?
+    
+    // 安定化後のイベント発生フラグ
+    private var eventOccurredAfterStabilization = false
+    
+    // フォールバックタイマー
+    private var fallbackTimer: DispatchWorkItem?
+    
     func applicationDidFinishLaunching(_ notification: Notification) {
         // グローバル参照を設定
         globalAppDelegate = self
@@ -149,7 +164,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         // ディスプレイ変更の監視を開始
         setupDisplayChangeObserver()
-        setupSleepWakeObserver()
+        
+        // 監視停止/再開の通知を設定
+        setupMonitoringControlObservers()
         
         // 定期スナップショットを開始(5秒ごと)
         startPeriodicSnapshot()
@@ -409,19 +426,147 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         debugPrint("✅ ディスプレイ変更の監視を開始しました")
     }
     
+    // 監視停止/再開の通知を設定
+    private func setupMonitoringControlObservers() {
+        NotificationCenter.default.addObserver(
+            forName: Notification.Name("DisableDisplayMonitoring"),
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.isDisplayMonitoringEnabled = false
+            debugPrint("⏸️ ディスプレイ監視を一時停止しました")
+        }
+        
+        NotificationCenter.default.addObserver(
+            forName: Notification.Name("EnableDisplayMonitoring"),
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.isDisplayMonitoringEnabled = true
+            debugPrint("▶️ ディスプレイ監視を再開しました")
+        }
+        
+        NotificationCenter.default.addObserver(
+            forName: Notification.Name("TriggerWindowRestoration"),
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            debugPrint("🔔 手動でウィンドウ復元処理をトリガーします")
+            self?.triggerRestoration()
+        }
+    }
+    
     @objc private func displayConfigurationChanged() {
         debugPrint("🖥️ ディスプレイ構成が変更されました")
         debugPrint("現在の画面数: \(NSScreen.screens.count)")
         
+        // 監視停止中でも最後のイベント時刻を記録
+        if !isDisplayMonitoringEnabled {
+            debugPrint("⏭️ 監視が一時停止中のため、復元処理をスキップします")
+            
+            // 最後のディスプレイ変更時刻を更新
+            lastDisplayChangeTime = Date()
+            debugPrint("📝 最後のディスプレイ変更時刻を記録: \(Date())")
+            
+            // 安定化確認タイマーを開始/リセット
+            startStabilizationCheck()
+            return
+        }
+        
+        // 監視有効時：イベント発生フラグをセット
+        eventOccurredAfterStabilization = true
+        
+        // 通常の復元処理
+        triggerRestoration()
+    }
+    
+    // 安定化確認タイマーを開始/リセット
+    private func startStabilizationCheck() {
+        // 既存のタイマーをキャンセル
+        stabilizationCheckTimer?.invalidate()
+        
+        let stabilizationDelay = WindowTimingSettings.shared.displayStabilizationDelay
+        debugPrint("⏱️ 安定化確認タイマー開始: \(String(format: "%.1f", stabilizationDelay))秒後にチェック")
+        
+        // 安定化時間後にチェック
+        stabilizationCheckTimer = Timer.scheduledTimer(withTimeInterval: stabilizationDelay, repeats: false) { [weak self] _ in
+            self?.checkStabilization()
+        }
+    }
+    
+    // 安定化確認
+    private func checkStabilization() {
+        guard let lastChange = lastDisplayChangeTime else {
+            debugPrint("⚠️ 最後のディスプレイ変更時刻が記録されていません")
+            return
+        }
+        
+        let elapsed = Date().timeIntervalSince(lastChange)
+        let stabilizationDelay = WindowTimingSettings.shared.displayStabilizationDelay
+        
+        debugPrint("🔍 安定化確認: 最後の変更から \(String(format: "%.1f", elapsed))秒経過")
+        
+        if elapsed >= stabilizationDelay {
+            debugPrint("✅ ディスプレイが安定したと判断（\(String(format: "%.1f", elapsed))秒間変更なし）")
+            
+            // 監視停止中なら、監視を再開
+            if !isDisplayMonitoringEnabled {
+                debugPrint("▶️ ディスプレイ安定化により監視を再開します")
+                isDisplayMonitoringEnabled = true
+                NotificationCenter.default.post(
+                    name: Notification.Name("EnableDisplayMonitoring"),
+                    object: nil
+                )
+                
+                // イベント発生フラグをリセット
+                eventOccurredAfterStabilization = false
+                
+                // 次のディスプレイ変更イベントを待つ（最大3秒）
+                debugPrint("⏳ 次のディスプレイ変更イベントを待機（最大3秒）")
+                
+                // フォールバック：3秒待ってもイベントが来なければ手動トリガー
+                let fallback = DispatchWorkItem { [weak self] in
+                    self?.fallbackRestoration()
+                }
+                fallbackTimer = fallback
+                DispatchQueue.main.asyncAfter(deadline: .now() + 3.0, execute: fallback)
+            }
+        } else {
+            debugPrint("⏳ まだ安定していません。再度チェックします。")
+            // 再度タイマーをセット
+            startStabilizationCheck()
+        }
+    }
+    
+    // フォールバック：イベントが来なかった場合の復元処理
+    private func fallbackRestoration() {
+        if !eventOccurredAfterStabilization {
+            debugPrint("⚠️ ディスプレイイベントが発生しなかったため、手動で復元をトリガーします")
+            triggerRestoration()
+        } else {
+            debugPrint("✅ ディスプレイイベントが発生したため、フォールバックはスキップします")
+        }
+        fallbackTimer = nil
+    }
+    
+    // 復元処理をトリガー（ディスプレイ変更イベントまたは手動トリガー）
+    private func triggerRestoration() {
         // 既存の復元処理をキャンセル
         restoreWorkItem?.cancel()
         
-        // 設定から遅延時間を取得
-        let stabilizationDelay = WindowTimingSettings.shared.displayStabilizationDelay
+        // 設定から遅延時間を取得（スリープ時間に応じて動的調整）
+        let adjustedStabilizationDelay = WindowTimingSettings.shared.getAdjustedDisplayDelay()
         let restoreDelay = WindowTimingSettings.shared.windowRestoreDelay
-        let totalDelay = stabilizationDelay + restoreDelay
+        let totalDelay = adjustedStabilizationDelay + restoreDelay
         
-        debugPrint("復元まで \(totalDelay)秒待機（安定化:\(stabilizationDelay)秒 + 復元:\(restoreDelay)秒）")
+        // スリープ時間情報をログに出力
+        let sleepHours = WindowTimingSettings.shared.sleepDurationHours
+        if sleepHours > 0 {
+            debugPrint("スリープ時間: \(String(format: "%.2f", sleepHours))時間")
+            debugPrint("調整後の安定化時間: \(String(format: "%.1f", adjustedStabilizationDelay))秒")
+        }
+        
+        debugPrint("復元まで \(String(format: "%.1f", totalDelay))秒待機（安定化:\(String(format: "%.1f", adjustedStabilizationDelay))秒 + 復元:\(String(format: "%.1f", restoreDelay))秒）")
         
         // 新しい復元処理を作成
         let workItem = DispatchWorkItem { [weak self] in
@@ -649,28 +794,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         debugPrint("✅ 合計 \(restoredCount)個のウィンドウを復元しました\n")
     }
-    
-    // スリープ/ウェイク通知の監視
-    private func setupSleepWakeObserver() {
-        NSWorkspace.shared.notificationCenter.addObserver(
-            forName: NSWorkspace.willSleepNotification,
-            object: nil,
-            queue: .main
-        ) { _ in
-            debugPrint("💤 System going to sleep")
-        }
-        
-        NSWorkspace.shared.notificationCenter.addObserver(
-            forName: NSWorkspace.didWakeNotification,
-            object: nil,
-            queue: .main
-        ) { _ in
-            debugPrint("☀️ System woke from sleep")
-        }
-        
-        debugPrint("✅ Sleep/wake monitoring started")
-    }
-    
     
     
     deinit {

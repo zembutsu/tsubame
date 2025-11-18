@@ -52,6 +52,7 @@ class WindowTimingSettings: ObservableObject {
     private let defaults = UserDefaults.standard
     private let windowDelayKey = "windowRestoreDelay"
     private let displayStabilizationKey = "displayStabilizationDelay"
+    private let disableMonitoringKey = "disableMonitoringDuringSleep"
     
     @Published var windowRestoreDelay: Double {
         didSet {
@@ -65,11 +66,113 @@ class WindowTimingSettings: ObservableObject {
         }
     }
     
+    @Published var disableMonitoringDuringSleep: Bool {
+        didSet {
+            defaults.set(disableMonitoringDuringSleep, forKey: disableMonitoringKey)
+        }
+    }
+    
+    // スリープ監視関連
+    @Published var lastSleepTime: Date?
+    @Published var lastWakeTime: Date?
+    @Published var sleepDurationHours: Double = 0
+    @Published var isMonitoringEnabled: Bool = true
+    
+    private var sleepObserver: NSObjectProtocol?
+    private var wakeObserver: NSObjectProtocol?
+    
     private init() {
         // デフォルト値: ディスプレイ接続後の待機時間は6.0秒
         self.windowRestoreDelay = defaults.object(forKey: windowDelayKey) as? Double ?? 6.0
         // デフォルト値: ディスプレイ変更の落ち着き待ち時間は6.0秒
         self.displayStabilizationDelay = defaults.object(forKey: displayStabilizationKey) as? Double ?? 6.0
+        // デフォルト値: スリープ中の監視停止を有効化
+        self.disableMonitoringDuringSleep = defaults.object(forKey: disableMonitoringKey) as? Bool ?? true
+        
+        // スリープ監視を開始
+        startSleepMonitoring()
+    }
+    
+    // スリープ監視開始
+    private func startSleepMonitoring() {
+        sleepObserver = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.willSleepNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            guard let self = self else { return }
+            self.lastSleepTime = Date()
+            print("💤 System going to sleep at \(Date())")
+            
+            // スリープ時にディスプレイ監視を一時停止
+            if self.disableMonitoringDuringSleep {
+                self.isMonitoringEnabled = false
+                print("⏸️ Display monitoring disabled during sleep")
+                NotificationCenter.default.post(
+                    name: Notification.Name("DisableDisplayMonitoring"),
+                    object: nil
+                )
+            }
+        }
+        
+        wakeObserver = NSWorkspace.shared.notificationCenter.addObserver(
+            forName: NSWorkspace.didWakeNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.handleWake()
+        }
+    }
+    
+    // ウェイク時の処理
+    private func handleWake() {
+        lastWakeTime = Date()
+        if let sleepTime = lastSleepTime {
+            let duration = Date().timeIntervalSince(sleepTime)
+            sleepDurationHours = duration / 3600.0
+            print("☀️ System woke from sleep after \(String(format: "%.2f", sleepDurationHours)) hours")
+        }
+        
+        // 監視一時停止機能が有効な場合
+        if disableMonitoringDuringSleep {
+            print("⏱️ ディスプレイ変更の安定化を待機中...")
+            print("   安定化検出により自動的に監視が再開されます")
+            // 注: 監視再開は安定化ロジック（AppDelegate）が自動的に行う
+            // ここでは何もしない = ディスプレイ変更イベントの安定化に任せる
+        }
+    }
+    
+    // 動的調整された待機時間を取得
+    func getAdjustedDisplayDelay() -> Double {
+        let baseDelay = displayStabilizationDelay
+        
+        // スリープ時間に応じて追加の待機時間を決定
+        switch sleepDurationHours {
+        case 0..<0.5:
+            // 30分未満: 変更なし
+            return baseDelay
+        case 0.5..<1.0:
+            // 30分〜1時間: +2秒
+            return baseDelay + 2.0
+        case 1.0..<2.0:
+            // 1〜2時間: +5秒
+            return baseDelay + 5.0
+        case 2.0..<4.0:
+            // 2〜4時間: +10秒
+            return baseDelay + 10.0
+        default:
+            // 4時間以上: +15秒
+            return baseDelay + 15.0
+        }
+    }
+    
+    deinit {
+        if let observer = sleepObserver {
+            NSWorkspace.shared.notificationCenter.removeObserver(observer)
+        }
+        if let observer = wakeObserver {
+            NSWorkspace.shared.notificationCenter.removeObserver(observer)
+        }
     }
 }
 
@@ -171,6 +274,69 @@ struct SettingsView: View {
             .background(Color.gray.opacity(0.1))
             .cornerRadius(8)
             
+            // スリープ情報セクション（デバッグ）
+            VStack(alignment: .leading, spacing: 12) {
+                Text("スリープ時の動作設定")
+                    .font(.headline)
+                
+                Toggle("スリープ中はディスプレイ監視を一時停止", isOn: $timingSettings.disableMonitoringDuringSleep)
+                    .toggleStyle(SwitchToggleStyle())
+                
+                Text("有効にすると、スリープ中に発生するディスプレイ変更イベントを無視します。Dock位置ずれ問題の軽減に役立つ可能性があります。")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .padding(.bottom, 8)
+                
+                Divider()
+                
+                Text("デバッグ情報")
+                    .font(.subheadline)
+                    .fontWeight(.semibold)
+                
+                if timingSettings.sleepDurationHours > 0 {
+                    HStack {
+                        Text("前回のスリープ:")
+                            .font(.subheadline)
+                        Spacer()
+                        Text(String(format: "%.2f時間", timingSettings.sleepDurationHours))
+                            .foregroundColor(.blue)
+                            .fontWeight(.semibold)
+                    }
+                    
+                    HStack {
+                        Text("調整後の待機時間:")
+                            .font(.subheadline)
+                        Spacer()
+                        Text(String(format: "%.1f秒", timingSettings.getAdjustedDisplayDelay()))
+                            .foregroundColor(.green)
+                            .fontWeight(.semibold)
+                    }
+                    
+                    HStack {
+                        Text("監視状態:")
+                            .font(.subheadline)
+                        Spacer()
+                        Text(timingSettings.isMonitoringEnabled ? "有効" : "一時停止中")
+                            .foregroundColor(timingSettings.isMonitoringEnabled ? .green : .orange)
+                            .fontWeight(.semibold)
+                    }
+                    
+                    if let wakeTime = timingSettings.lastWakeTime {
+                        Text("最終復帰: \(wakeTime.formatted(date: .omitted, time: .standard))")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                } else {
+                    Text("スリープ情報なし")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                }
+            }
+            .padding()
+            .background(Color.gray.opacity(0.1))
+            .cornerRadius(8)
+            
             Text("⚠️ 設定を変更したらアプリを再起動してください")
                 .font(.caption)
                 .foregroundColor(.orange)
@@ -183,6 +349,7 @@ struct SettingsView: View {
                     settings.useCommand = true
                     timingSettings.displayStabilizationDelay = 6.0
                     timingSettings.windowRestoreDelay = 6.0
+                    timingSettings.disableMonitoringDuringSleep = true
                 }
                 
                 Spacer()
@@ -195,6 +362,6 @@ struct SettingsView: View {
             .padding(.bottom)
         }
         .padding()
-        .frame(width: 500, height: 715)
+        .frame(width: 500, height: 980)
     }
 }
