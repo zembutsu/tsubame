@@ -187,14 +187,11 @@ open WindowSmartMover.xcodeproj
 - Fullscreen windows cannot be moved
 - Display reconnection timing may vary by hardware
 
-### Display & Sleep/Wake (v1.2.0+)
-- **Dock menu misalignment after sleep/wake** (investigating)
-  - **Symptoms**: Menu appears offset from Dock icons after waking from sleep with external displays
-  - **Impact**: Visual only - does not affect window restoration or app functionality
-  - **Affected versions**: v1.2.0 and later
-  - **Workaround**: Run `killall Dock` in Terminal to immediately reset
-  - **Alternative**: Use v1.1.0 if Dock stability is critical
-  - **Status**: Root cause under investigation - appears to be macOS-level interaction
+### Display & Sleep/Wake
+- **Dock menu misalignment after sleep/wake** (largely resolved in v1.2.2)
+  - Most cases resolved by improved stabilization timing
+  - Remaining cases may be caused by other menu bar apps
+  - **Workaround**: Run `killall Dock` in Terminal to reset
   - See GitHub Issues for updates
 
 ### Display Timing Recommendations
@@ -248,6 +245,11 @@ The debug log viewer helps diagnose issues:
 No sensitive information is logged or transmitted.
 
 ## Roadmap
+
+### Completed (v1.2.2)
+- [x] Fixed stabilization timer reset issue during continuous display events
+- [x] Reliable window restoration after long sleep periods
+- [x] Debug log window refresh on each open
 
 ### Completed (v1.2.0)
 - [x] Two-stage display reconnection timing

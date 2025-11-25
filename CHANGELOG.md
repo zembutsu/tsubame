@@ -29,6 +29,26 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Support for more than 2 displays
 - Configurable snapshot interval
 
+## [1.2.2] - 2025-11-25
+
+### Fixed
+- **Critical**: Stabilization timer reset issue during continuous display events (#7)
+  - Changed from one-shot timer to periodic check (0.5s interval)
+  - Now properly waits for elapsed time since the last event
+  - Resolves window restoration failures after long sleep periods
+- Debug log window now shows latest logs on each open
+  - Previously cached logs from first open
+
+### Technical Details
+- Implemented `stabilizationCheckTimer` with 0.5s repeating interval
+- Records display events continuously during monitoring suspension
+- Calculates elapsed time from `lastDisplayChangeTime` for true stabilization detection
+- Debug log window recreated on each open instead of reusing cached instance
+
+### Testing
+- Verified with 1 week of continuous operation testing
+- Confirmed reliable window restoration after sleep/wake cycles
+
 ## [1.2.1] - 2025-11-15
 
 ### Added
@@ -56,13 +76,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Reduces unnecessary processing and system load
 
 ### Known Issues
-- **Dock menu misalignment after sleep/wake** (investigating)
-  - Affects some macOS configurations during sleep/wake cycles
-  - Does NOT affect window restoration functionality
+- **Dock menu misalignment after sleep/wake** (largely resolved in v1.2.2)
+  - Most cases resolved by improved stabilization timing
+  - Remaining cases may be caused by other menu bar apps
   - Workaround: Run `killall Dock` in Terminal to reset
-  - Root cause appears to be macOS-level interaction, not WindowSmartMover code
-  - Issue does not occur in v1.1.0
-  - Users requiring stable Dock behavior may prefer v1.1.0 until resolved
 
 ### Technical Details
 - Removed `displayStabilizationTimer?.invalidate()` pattern
