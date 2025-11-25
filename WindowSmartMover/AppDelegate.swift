@@ -145,6 +145,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // グローバル参照を設定
         globalAppDelegate = self
         
+        // WindowTimingSettingsを初期化してスリープ監視を開始
+        _ = WindowTimingSettings.shared
+        
         // システムバーにアイコンを追加
         statusItem = NSStatusBar.system.statusItem(withLength: NSStatusItem.variableLength)
         
@@ -216,7 +219,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             let hostingController = NSHostingController(rootView: aboutView)
             
             let window = NSWindow(contentViewController: hostingController)
-            window.title = "About"
+            window.title = "About WindowSmartMover"
             window.styleMask = [.titled, .closable]
             window.center()
             window.level = .floating
@@ -229,154 +232,159 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
     
     @objc func showDebugLog() {
+        // 毎回新しいウィンドウを作成して最新のログを表示
         let debugView = DebugLogView()
         let hostingController = NSHostingController(rootView: debugView)
         
-        if debugWindow == nil {
-            let window = NSWindow(contentViewController: hostingController)
-            window.title = "デバッグログ"
-            window.styleMask = [.titled, .closable, .resizable]
-            window.center()
-            window.level = .floating
-            window.setContentSize(NSSize(width: 700, height: 500))
-            
-            debugWindow = window
-        } else {
-            // 既存のウィンドウがある場合は内容を更新
-            debugWindow?.contentViewController = hostingController
-        }
+        let window = NSWindow(contentViewController: hostingController)
+        window.title = "デバッグログ"
+        window.styleMask = [.titled, .closable, .resizable]
+        window.center()
+        window.level = .floating
+        
+        debugWindow = window
         
         debugWindow?.makeKeyAndOrderFront(nil)
         NSApp.activate(ignoringOtherApps: true)
     }
     
+    func checkAccessibilityPermissions() {
+        let options: NSDictionary = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true]
+        let accessEnabled = AXIsProcessTrustedWithOptions(options)
+        
+        if accessEnabled {
+            debugPrint("✅ アクセシビリティ権限が付与されています")
+        } else {
+            debugPrint("⚠️ アクセシビリティ権限が必要です")
+        }
+    }
+    
     func registerHotKeys() {
-        // 既存のホットキーを解除
-        if let hotKey = hotKeyRef {
-            UnregisterEventHotKey(hotKey)
-            hotKeyRef = nil
-        }
-        if let hotKey = hotKeyRef2 {
-            UnregisterEventHotKey(hotKey)
-            hotKeyRef2 = nil
-        }
-        
-        // イベントタイプの指定
+        // イベントハンドラーをインストール
         var eventType = EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyPressed))
+        let status = InstallEventHandler(GetApplicationEventTarget(), hotKeyHandler, 1, &eventType, nil, &eventHandler)
         
-        // イベントハンドラをインストール(初回のみ)
-        if eventHandler == nil {
-            let status = InstallEventHandler(GetApplicationEventTarget(), hotKeyHandler, 1, &eventType, nil, &eventHandler)
-            
-            if status == noErr {
-                debugPrint("✅ イベントハンドラのインストール成功")
-            } else {
-                debugPrint("❌ イベントハンドラのインストール失敗: \(status)")
-            }
+        if status == noErr {
+            debugPrint("✅ イベントハンドラのインストール成功")
+        } else {
+            debugPrint("❌ イベントハンドラのインストール失敗: \(status)")
         }
         
-        // 設定から修飾キーを取得
-        let modifiers = HotKeySettings.shared.getModifiers()
-        let modifierString = HotKeySettings.shared.getModifierString()
+        // ホットキーを登録
+        let settings = HotKeySettings.shared
+        let modifiers = settings.getModifiers()
         
-        // Ctrl + Option + Command + 右矢印
-        let gMyHotKeyID1 = EventHotKeyID(signature: OSType(0x4D4F5652), id: 1) // 'MOVR'
-        var hotKey1: EventHotKeyRef?
-        let registerStatus1 = RegisterEventHotKey(UInt32(kVK_RightArrow), modifiers, gMyHotKeyID1, GetApplicationEventTarget(), 0, &hotKey1)
+        // 1つ目のホットキー: 次の画面へ (右矢印)
+        let hotKeyID1 = EventHotKeyID(signature: OSType(0x4D4F5645), id: 1) // 'MOVE' + 1
+        let keyCode1 = UInt32(kVK_RightArrow)
+        let registerStatus1 = RegisterEventHotKey(keyCode1, modifiers, hotKeyID1, GetApplicationEventTarget(), 0, &hotKeyRef)
         
         if registerStatus1 == noErr {
-            hotKeyRef = hotKey1
+            let modifierString = settings.getModifierString()
             debugPrint("✅ ホットキー1 (\(modifierString)→) の登録成功")
         } else {
-            debugPrint("❌ ホットキー1 の登録失敗: \(registerStatus1)")
+            debugPrint("❌ ホットキー1の登録失敗: \(registerStatus1)")
         }
         
-        // Ctrl + Option + Command + 左矢印
-        let gMyHotKeyID2 = EventHotKeyID(signature: OSType(0x4D4F564C), id: 2) // 'MOVL'
-        var hotKey2: EventHotKeyRef?
-        let registerStatus2 = RegisterEventHotKey(UInt32(kVK_LeftArrow), modifiers, gMyHotKeyID2, GetApplicationEventTarget(), 0, &hotKey2)
+        // 2つ目のホットキー: 前の画面へ (左矢印)
+        let hotKeyID2 = EventHotKeyID(signature: OSType(0x4D4F5645), id: 2) // 'MOVE' + 2
+        let keyCode2 = UInt32(kVK_LeftArrow)
+        let registerStatus2 = RegisterEventHotKey(keyCode2, modifiers, hotKeyID2, GetApplicationEventTarget(), 0, &hotKeyRef2)
         
         if registerStatus2 == noErr {
-            hotKeyRef2 = hotKey2
+            let modifierString = settings.getModifierString()
             debugPrint("✅ ホットキー2 (\(modifierString)←) の登録成功")
         } else {
-            debugPrint("❌ ホットキー2 の登録失敗: \(registerStatus2)")
+            debugPrint("❌ ホットキー2の登録失敗: \(registerStatus2)")
         }
     }
     
     @objc func moveWindowToNextScreen() {
-        debugPrint("=== 次の画面への移動を開始 ===")
-        moveWindow(direction: 1)
+        moveWindow(direction: .next)
     }
     
     @objc func moveWindowToPrevScreen() {
-        debugPrint("=== 前の画面への移動を開始 ===")
-        moveWindow(direction: -1)
+        moveWindow(direction: .prev)
     }
     
-    func moveWindow(direction: Int) {
-        guard let frontmostApp = NSWorkspace.shared.frontmostApplication else {
-            debugPrint("❌ フロントアプリを取得できませんでした")
+    enum Direction {
+        case next
+        case prev
+    }
+    
+    func moveWindow(direction: Direction) {
+        debugPrint("=== \(direction == .next ? "次" : "前")の画面への移動を開始 ===")
+        
+        // フロントのアプリケーションを取得
+        guard let frontApp = NSWorkspace.shared.frontmostApplication,
+              let appName = frontApp.localizedName else {
+            debugPrint("❌ フロントアプリの取得に失敗しました")
             return
         }
         
-        debugPrint("フロントアプリ: \(frontmostApp.localizedName ?? "不明")")
+        debugPrint("フロントアプリ: \(appName)")
         
-        let pid = frontmostApp.processIdentifier
-        let appRef = AXUIElementCreateApplication(pid)
+        // Accessibility APIでウィンドウを取得
+        let appRef = AXUIElementCreateApplication(frontApp.processIdentifier)
+        var windowRef: AnyObject?
+        let result = AXUIElementCopyAttributeValue(appRef, kAXFocusedWindowAttribute as CFString, &windowRef)
         
-        var focusedWindowRef: CFTypeRef?
-        let result = AXUIElementCopyAttributeValue(appRef, kAXFocusedWindowAttribute as CFString, &focusedWindowRef)
-        
-        guard result == .success, let focusedWindow = focusedWindowRef else {
-            debugPrint("❌ フォーカスされたウィンドウがありません")
+        guard result == .success, let window = windowRef else {
+            debugPrint("❌ フォーカスされたウィンドウの取得に失敗しました")
             return
         }
         
         debugPrint("✅ フォーカスされたウィンドウを取得しました")
         
-        // ウィンドウの現在の位置とサイズを取得
-        var positionRef: CFTypeRef?
-        var sizeRef: CFTypeRef?
+        // 現在の位置とサイズを取得
+        var positionRef: AnyObject?
+        var sizeRef: AnyObject?
         
-        guard AXUIElementCopyAttributeValue(focusedWindow as! AXUIElement, kAXPositionAttribute as CFString, &positionRef) == .success,
-              AXUIElementCopyAttributeValue(focusedWindow as! AXUIElement, kAXSizeAttribute as CFString, &sizeRef) == .success else {
-            debugPrint("❌ ウィンドウの位置またはサイズを取得できませんでした")
+        AXUIElementCopyAttributeValue(window as! AXUIElement, kAXPositionAttribute as CFString, &positionRef)
+        AXUIElementCopyAttributeValue(window as! AXUIElement, kAXSizeAttribute as CFString, &sizeRef)
+        
+        guard let positionValue = positionRef, let sizeValue = sizeRef else {
+            debugPrint("❌ ウィンドウの位置・サイズの取得に失敗しました")
             return
         }
         
         var position = CGPoint.zero
         var size = CGSize.zero
-        
-        guard let positionValue = positionRef, let sizeValue = sizeRef,
-              AXValueGetValue(positionValue as! AXValue, .cgPoint, &position),
-              AXValueGetValue(sizeValue as! AXValue, .cgSize, &size) else {
-            debugPrint("❌ 位置やサイズの値を取得できませんでした")
-            return
-        }
+        AXValueGetValue(positionValue as! AXValue, .cgPoint, &position)
+        AXValueGetValue(sizeValue as! AXValue, .cgSize, &size)
         
         debugPrint("現在のウィンドウ位置: \(position), サイズ: \(size)")
         
+        // 利用可能な画面を取得
         let screens = NSScreen.screens
         debugPrint("利用可能な画面数: \(screens.count)")
         
         guard screens.count > 1 else {
-            debugPrint("❌ 画面が1つしかありません")
+            debugPrint("❌ 複数の画面が接続されていません")
             return
         }
         
-        // 現在のウィンドウがどの画面にあるかを判定
+        // 現在の画面を特定
         var currentScreenIndex = 0
         for (index, screen) in screens.enumerated() {
-            if screen.frame.contains(position) {
+            let screenFrame = screen.frame
+            if screenFrame.contains(position) {
                 currentScreenIndex = index
-                debugPrint("現在の画面インデックス: \(index)")
                 break
             }
         }
         
-        // 次の画面のインデックスを計算
-        let nextScreenIndex = (currentScreenIndex + direction + screens.count) % screens.count
+        debugPrint("現在の画面インデックス: \(currentScreenIndex)")
+        
+        // 次/前の画面のインデックスを計算
+        let nextScreenIndex: Int
+        switch direction {
+        case .next:
+            nextScreenIndex = (currentScreenIndex + 1) % screens.count
+        case .prev:
+            nextScreenIndex = (currentScreenIndex - 1 + screens.count) % screens.count
+        }
+        
         debugPrint("次の画面インデックス: \(nextScreenIndex)")
         
         let currentScreen = screens[currentScreenIndex]
@@ -394,7 +402,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         // ウィンドウを移動
         if let positionValue = AXValueCreate(.cgPoint, &newPosition) {
-            let setResult = AXUIElementSetAttributeValue(focusedWindow as! AXUIElement, kAXPositionAttribute as CFString, positionValue)
+            let setResult = AXUIElementSetAttributeValue(window as! AXUIElement, kAXPositionAttribute as CFString, positionValue)
             
             if setResult == .success {
                 debugPrint("✅ ウィンドウの移動に成功しました")
@@ -404,18 +412,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
     
-    func checkAccessibilityPermissions() {
-        let options = [kAXTrustedCheckOptionPrompt.takeUnretainedValue() as String: true]
-        let accessEnabled = AXIsProcessTrustedWithOptions(options as CFDictionary)
-        
-        if accessEnabled {
-            debugPrint("✅ アクセシビリティ権限が付与されています")
-        } else {
-            debugPrint("⚠️ アクセシビリティ権限が必要です")
-        }
-    }
-    
-    // ディスプレイ変更を監視
+    /// ディスプレイ変更の監視を設定
     private func setupDisplayChangeObserver() {
         NotificationCenter.default.addObserver(
             self,
@@ -426,183 +423,156 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         debugPrint("✅ ディスプレイ変更の監視を開始しました")
     }
     
-    // 監視停止/再開の通知を設定
+    /// 監視停止/再開の通知を設定
     private func setupMonitoringControlObservers() {
         NotificationCenter.default.addObserver(
-            forName: Notification.Name("DisableDisplayMonitoring"),
-            object: nil,
-            queue: .main
-        ) { [weak self] _ in
-            self?.isDisplayMonitoringEnabled = false
-            debugPrint("⏸️ ディスプレイ監視を一時停止しました")
-        }
+            self,
+            selector: #selector(pauseMonitoring),
+            name: NSNotification.Name("DisableDisplayMonitoring"),
+            object: nil
+        )
         
         NotificationCenter.default.addObserver(
-            forName: Notification.Name("EnableDisplayMonitoring"),
-            object: nil,
-            queue: .main
-        ) { [weak self] _ in
-            self?.isDisplayMonitoringEnabled = true
-            debugPrint("▶️ ディスプレイ監視を再開しました")
-        }
-        
-        NotificationCenter.default.addObserver(
-            forName: Notification.Name("TriggerWindowRestoration"),
-            object: nil,
-            queue: .main
-        ) { [weak self] _ in
-            debugPrint("🔔 手動でウィンドウ復元処理をトリガーします")
-            self?.triggerRestoration()
-        }
+            self,
+            selector: #selector(resumeMonitoring),
+            name: NSNotification.Name("ResumeDisplayMonitoring"),
+            object: nil
+        )
     }
     
+    /// ディスプレイ構成が変更されたときの処理
     @objc private func displayConfigurationChanged() {
+        let screenCount = NSScreen.screens.count
         debugPrint("🖥️ ディスプレイ構成が変更されました")
-        debugPrint("現在の画面数: \(NSScreen.screens.count)")
+        debugPrint("現在の画面数: \(screenCount)")
         
-        // 監視停止中でも最後のイベント時刻を記録
+        // 監視が無効化されている場合
         if !isDisplayMonitoringEnabled {
-            debugPrint("⏭️ 監視が一時停止中のため、復元処理をスキップします")
-            
-            // 最後のディスプレイ変更時刻を更新
+            // イベントを記録し続ける（これが重要！）
             lastDisplayChangeTime = Date()
-            debugPrint("📝 最後のディスプレイ変更時刻を記録: \(Date())")
             
-            // 安定化確認タイマーを開始/リセット
-            startStabilizationCheck()
+            // タイマーがまだ動いていなければ開始
+            if stabilizationCheckTimer == nil {
+                startStabilizationCheck()
+            }
             return
         }
         
-        // 監視有効時：イベント発生フラグをセット
+        // 監視が有効な場合 - フォールバックをキャンセルして復元
+        fallbackTimer?.cancel()
         eventOccurredAfterStabilization = true
-        
-        // 通常の復元処理
         triggerRestoration()
     }
     
-    // 安定化確認タイマーを開始/リセット
+    /// 安定化確認タイマーを開始
     private func startStabilizationCheck() {
-        // 既存のタイマーをキャンセル
         stabilizationCheckTimer?.invalidate()
         
-        let stabilizationDelay = WindowTimingSettings.shared.displayStabilizationDelay
-        debugPrint("⏱️ 安定化確認タイマー開始: \(String(format: "%.1f", stabilizationDelay))秒後にチェック")
-        
-        // 安定化時間後にチェック
-        stabilizationCheckTimer = Timer.scheduledTimer(withTimeInterval: stabilizationDelay, repeats: false) { [weak self] _ in
+        // 0.5秒ごとに安定化をチェック
+        stabilizationCheckTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
             self?.checkStabilization()
         }
     }
     
-    // 安定化確認
+    /// 安定化を確認
     private func checkStabilization() {
-        guard let lastChange = lastDisplayChangeTime else {
-            debugPrint("⚠️ 最後のディスプレイ変更時刻が記録されていません")
-            return
-        }
+        guard let lastChange = lastDisplayChangeTime else { return }
         
+        // 最後のイベントからの経過時間を計算
         let elapsed = Date().timeIntervalSince(lastChange)
         let stabilizationDelay = WindowTimingSettings.shared.displayStabilizationDelay
         
-        debugPrint("🔍 安定化確認: 最後の変更から \(String(format: "%.1f", elapsed))秒経過")
-        
         if elapsed >= stabilizationDelay {
-            debugPrint("✅ ディスプレイが安定したと判断（\(String(format: "%.1f", elapsed))秒間変更なし）")
+            // 真の安定化を達成
+            stabilizationCheckTimer?.invalidate()
+            stabilizationCheckTimer = nil
             
-            // 監視停止中なら、監視を再開
-            if !isDisplayMonitoringEnabled {
-                debugPrint("▶️ ディスプレイ安定化により監視を再開します")
-                isDisplayMonitoringEnabled = true
-                NotificationCenter.default.post(
-                    name: Notification.Name("EnableDisplayMonitoring"),
-                    object: nil
-                )
-                
-                // イベント発生フラグをリセット
-                eventOccurredAfterStabilization = false
-                
-                // 次のディスプレイ変更イベントを待つ（最大3秒）
-                debugPrint("⏳ 次のディスプレイ変更イベントを待機（最大3秒）")
-                
-                // フォールバック：3秒待ってもイベントが来なければ手動トリガー
-                let fallback = DispatchWorkItem { [weak self] in
-                    self?.fallbackRestoration()
-                }
-                fallbackTimer = fallback
-                DispatchQueue.main.asyncAfter(deadline: .now() + 3.0, execute: fallback)
+            isDisplayMonitoringEnabled = true
+            eventOccurredAfterStabilization = false
+            
+            debugPrint("✅ ディスプレイが安定したと判断（最後のイベントから\(String(format: "%.1f", elapsed))秒経過）")
+            debugPrint("▶️ ディスプレイ安定化により監視を再開します")
+            debugPrint("⏳ 次のディスプレイ変更イベントを待機（最大3秒）")
+            
+            // フォールバック設定（3秒後）
+            let fallback = DispatchWorkItem { [weak self] in
+                self?.fallbackRestoration()
             }
-        } else {
-            debugPrint("⏳ まだ安定していません。再度チェックします。")
-            // 再度タイマーをセット
-            startStabilizationCheck()
+            fallbackTimer = fallback
+            DispatchQueue.main.asyncAfter(deadline: .now() + 3.0, execute: fallback)
         }
     }
     
-    // フォールバック：イベントが来なかった場合の復元処理
+    /// フォールバック復元
     private func fallbackRestoration() {
         if !eventOccurredAfterStabilization {
+            // イベントが来なかった → 手動トリガー
             debugPrint("⚠️ ディスプレイイベントが発生しなかったため、手動で復元をトリガーします")
             triggerRestoration()
         } else {
+            // イベントが来た → スキップ
             debugPrint("✅ ディスプレイイベントが発生したため、フォールバックはスキップします")
         }
-        fallbackTimer = nil
     }
     
-    // 復元処理をトリガー（ディスプレイ変更イベントまたは手動トリガー）
+    /// 復元処理をトリガー
     private func triggerRestoration() {
-        // 既存の復元処理をキャンセル
+        // 既存のタイマーをキャンセル
         restoreWorkItem?.cancel()
         
-        // 設定から遅延時間を取得（スリープ時間に応じて動的調整）
-        let adjustedStabilizationDelay = WindowTimingSettings.shared.getAdjustedDisplayDelay()
-        let restoreDelay = WindowTimingSettings.shared.windowRestoreDelay
-        let totalDelay = adjustedStabilizationDelay + restoreDelay
+        let settings = WindowTimingSettings.shared
+        let totalDelay = settings.windowRestoreDelay
         
-        // スリープ時間情報をログに出力
-        let sleepHours = WindowTimingSettings.shared.sleepDurationHours
-        if sleepHours > 0 {
-            debugPrint("スリープ時間: \(String(format: "%.2f", sleepHours))時間")
-            debugPrint("調整後の安定化時間: \(String(format: "%.1f", adjustedStabilizationDelay))秒")
-        }
+        debugPrint("復元まで \(totalDelay)秒待機")
         
-        debugPrint("復元まで \(String(format: "%.1f", totalDelay))秒待機（安定化:\(String(format: "%.1f", adjustedStabilizationDelay))秒 + 復元:\(String(format: "%.1f", restoreDelay))秒）")
-        
-        // 新しい復元処理を作成
         let workItem = DispatchWorkItem { [weak self] in
             self?.restoreWindowsIfNeeded()
         }
         
-        // 保存してスケジュール
         restoreWorkItem = workItem
         DispatchQueue.main.asyncAfter(deadline: .now() + totalDelay, execute: workItem)
     }
     
-    /// 定期的にウィンドウ位置のスナップショットを取る
-    private func startPeriodicSnapshot() {
-        snapshotTimer = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: true) { [weak self] _ in
-            self?.snapshotAllWindows()
-        }
-        debugPrint("✅ 定期スナップショットを開始しました(5秒間隔)")
+    /// 監視を一時停止
+    @objc private func pauseMonitoring() {
+        isDisplayMonitoringEnabled = false
+        lastDisplayChangeTime = nil
+        stabilizationCheckTimer?.invalidate()
+        stabilizationCheckTimer = nil
+        fallbackTimer?.cancel()
+        eventOccurredAfterStabilization = false
+        debugPrint("⏸️ ディスプレイ監視を一時停止しました")
     }
     
-    /// ディスプレイの一意な識別子を取得
+    /// 監視を再開
+    @objc private func resumeMonitoring() {
+        debugPrint("⏱️ ディスプレイ変更の安定化を待機中...")
+    }
+    
+    /// ディスプレイ識別子を取得
     private func getDisplayIdentifier(for screen: NSScreen) -> String {
-        // NSScreenのデバイス記述から識別子を生成
         if let screenNumber = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? CGDirectDisplayID {
-            return "\(screenNumber)"
+            return String(screenNumber)
         }
-        // フォールバック: フレーム情報から生成
-        return "\(screen.frame.origin.x)_\(screen.frame.origin.y)"
+        // フォールバック: 画面のフレームを使用
+        return "\(Int(screen.frame.origin.x))_\(Int(screen.frame.origin.y))_\(Int(screen.frame.width))_\(Int(screen.frame.height))"
     }
     
-    /// ウィンドウの一意な識別子を生成
+    /// ウィンドウ識別子を作成
     private func getWindowIdentifier(appName: String, windowID: CGWindowID) -> String {
         return "\(appName)_\(windowID)"
     }
     
-    /// 全ウィンドウの位置をスナップショット
-    private func snapshotAllWindows() {
+    /// 定期スナップショットを開始
+    private func startPeriodicSnapshot() {
+        snapshotTimer = Timer.scheduledTimer(withTimeInterval: 5.0, repeats: true) { [weak self] _ in
+            self?.takeWindowSnapshot()
+        }
+        debugPrint("✅ 定期スナップショットを開始しました(5秒間隔)")
+    }
+    
+    /// 現在のウィンドウ配置のスナップショットを取得
+    private func takeWindowSnapshot() {
         let options = CGWindowListOption(arrayLiteral: .excludeDesktopElements, .optionOnScreenOnly)
         guard let windowList = CGWindowListCopyWindowInfo(options, kCGNullWindowID) as? [[String: Any]] else {
             return
