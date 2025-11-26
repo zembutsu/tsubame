@@ -39,17 +39,25 @@ A lightweight macOS menu bar app for effortless window management across multipl
   - Optimize for your specific multi-monitor setup
   - Settings persist across app restarts
 
-### Coming Soon (v1.3.0 - In Development) 🚧
+### Manual Snapshot (v1.2.3+)
+- **Save & Restore Window Layouts**: User-controlled window position memory
+  - `⌃⌥⌘↑` Save current window layout
+  - `⌃⌥⌘↓` Restore saved layout
+  - Menu bar commands available
+- **Independent from Auto-Restore**: Works separately from display reconnection
+- **Current Limitations**:
+  - Snapshots cleared when app exits (not persistent yet)
+  - Restarted apps cannot be restored (window IDs change)
+  - Fullscreen/minimized windows excluded
 
-⚠️ **Note**: These features are under active development and not yet available in stable releases.
+### Coming Soon (v1.3.0) 🚧
 
-- **Manual Window Snapshot & Restore**: Save and restore window layouts on demand
-  - Save current layout: Configurable hotkey (default: Ctrl+Cmd+↑)
-  - Restore saved layout: Configurable hotkey (default: Ctrl+Cmd+↓)
-  - Independent from automatic restoration
-  - Perfect fallback when automatic restoration fails
-  - Visual feedback with success/failure notifications
-  - Menu bar integration
+⚠️ **Note**: These features are under active development.
+
+- **Enhanced Snapshot Features**:
+  - Visual/audio notification feedback
+  - Multiple snapshot slots with UI selection
+  - Persistent snapshot storage
 - **Internationalization (English UI + Japanese localization)**
   - English as default language
   - Japanese localization
@@ -246,6 +254,11 @@ No sensitive information is logged or transmitted.
 
 ## Roadmap
 
+### Completed (v1.2.3)
+- [x] Manual window snapshot & restore (MVP)
+- [x] Save/restore hotkeys (Ctrl+Cmd+↑/↓)
+- [x] Menu bar integration for snapshot operations
+
 ### Completed (v1.2.2)
 - [x] Fixed stabilization timer reset issue during continuous display events
 - [x] Reliable window restoration after long sleep periods
@@ -258,13 +271,12 @@ No sensitive information is logged or transmitted.
 - [x] Debug log viewer with copy functionality
 
 ### In Development (v1.3.0)
-- [ ] Manual window snapshot & restore with configurable hotkeys
+- [ ] Enhanced snapshot features (visual/audio feedback, multiple slots)
+- [ ] Persistent snapshot storage
 - [ ] Internationalization (English UI + Japanese localization)
 - [ ] Localized debug logs
 
 ### Future Considerations (Post v1.3.0)
-- [ ] Multiple snapshot slots (save/restore multiple layouts)
-- [ ] Persistent snapshot storage
 - [ ] Snapshot management interface
 - [ ] Window size restoration (currently position only)
 - [ ] Support for more than 2 displays

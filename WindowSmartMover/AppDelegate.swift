@@ -26,6 +26,10 @@ private func hotKeyHandler(nextHandler: EventHandlerCallRef?, event: EventRef?, 
             appDelegate.moveWindowToNextScreen()
         case 2: // 左矢印(前の画面)
             appDelegate.moveWindowToPrevScreen()
+        case 3: // 上矢印(スナップショット保存)
+            appDelegate.saveManualSnapshot()
+        case 4: // 下矢印(スナップショット復元)
+            appDelegate.restoreManualSnapshot()
         default:
             break
         }
@@ -111,6 +115,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     var statusItem: NSStatusItem?
     var hotKeyRef: EventHotKeyRef?
     var hotKeyRef2: EventHotKeyRef?
+    var hotKeyRef3: EventHotKeyRef?  // スナップショット保存（↑）
+    var hotKeyRef4: EventHotKeyRef?  // スナップショット復元（↓）
     var eventHandler: EventHandlerRef?
     var settingsWindow: NSWindow?
     var aboutWindow: NSWindow?
@@ -119,6 +125,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     // ディスプレイ記憶機能
     private var windowPositions: [String: [String: CGRect]] = [:]
     private var snapshotTimer: Timer?
+    
+    // 手動スナップショット機能（5スロット、将来拡張用）
+    private var manualSnapshots: [[String: [String: CGRect]]] = Array(repeating: [:], count: 5)
+    private var currentSlotIndex: Int = 0  // v1.2.3では常に0
     
     // ディスプレイ変更の落ち着き待ちタイマー
     private var displayStabilizationTimer: Timer?
@@ -184,6 +194,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let modifierString = HotKeySettings.shared.getModifierString()
         menu.addItem(NSMenuItem(title: "ウィンドウを次の画面へ (\(modifierString)→)", action: #selector(moveWindowToNextScreen), keyEquivalent: ""))
         menu.addItem(NSMenuItem(title: "ウィンドウを前の画面へ (\(modifierString)←)", action: #selector(moveWindowToPrevScreen), keyEquivalent: ""))
+        menu.addItem(NSMenuItem.separator())
+        menu.addItem(NSMenuItem(title: "📸 配置を保存 (\(modifierString)↑)", action: #selector(saveManualSnapshot), keyEquivalent: ""))
+        menu.addItem(NSMenuItem(title: "📥 配置を復元 (\(modifierString)↓)", action: #selector(restoreManualSnapshot), keyEquivalent: ""))
         menu.addItem(NSMenuItem.separator())
         menu.addItem(NSMenuItem(title: "設定...", action: #selector(openSettings), keyEquivalent: ","))
         menu.addItem(NSMenuItem(title: "デバッグログを表示", action: #selector(showDebugLog), keyEquivalent: "d"))
@@ -296,6 +309,30 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             debugPrint("✅ ホットキー2 (\(modifierString)←) の登録成功")
         } else {
             debugPrint("❌ ホットキー2の登録失敗: \(registerStatus2)")
+        }
+        
+        // 3つ目のホットキー: スナップショット保存 (上矢印)
+        let hotKeyID3 = EventHotKeyID(signature: OSType(0x4D4F5645), id: 3) // 'MOVE' + 3
+        let keyCode3 = UInt32(kVK_UpArrow)
+        let registerStatus3 = RegisterEventHotKey(keyCode3, modifiers, hotKeyID3, GetApplicationEventTarget(), 0, &hotKeyRef3)
+        
+        if registerStatus3 == noErr {
+            let modifierString = settings.getModifierString()
+            debugPrint("✅ ホットキー3 (\(modifierString)↑) の登録成功")
+        } else {
+            debugPrint("❌ ホットキー3の登録失敗: \(registerStatus3)")
+        }
+        
+        // 4つ目のホットキー: スナップショット復元 (下矢印)
+        let hotKeyID4 = EventHotKeyID(signature: OSType(0x4D4F5645), id: 4) // 'MOVE' + 4
+        let keyCode4 = UInt32(kVK_DownArrow)
+        let registerStatus4 = RegisterEventHotKey(keyCode4, modifiers, hotKeyID4, GetApplicationEventTarget(), 0, &hotKeyRef4)
+        
+        if registerStatus4 == noErr {
+            let modifierString = settings.getModifierString()
+            debugPrint("✅ ホットキー4 (\(modifierString)↓) の登録成功")
+        } else {
+            debugPrint("❌ ホットキー4の登録失敗: \(registerStatus4)")
         }
     }
     
@@ -617,6 +654,155 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
     
+    /// 手動スナップショットを保存
+    @objc func saveManualSnapshot() {
+        debugPrint("📸 手動スナップショット保存を開始（スロット\(currentSlotIndex)）")
+        
+        let options = CGWindowListOption(arrayLiteral: .excludeDesktopElements, .optionOnScreenOnly)
+        guard let windowList = CGWindowListCopyWindowInfo(options, kCGNullWindowID) as? [[String: Any]] else {
+            debugPrint("  ❌ ウィンドウリストの取得に失敗")
+            return
+        }
+        
+        let screens = NSScreen.screens
+        var snapshot: [String: [String: CGRect]] = [:]
+        
+        // 画面ごとに初期化
+        for screen in screens {
+            let displayID = getDisplayIdentifier(for: screen)
+            snapshot[displayID] = [:]
+        }
+        
+        var savedCount = 0
+        
+        // 全ウィンドウを記録
+        for window in windowList {
+            guard let layer = window[kCGWindowLayer as String] as? Int, layer == 0,
+                  let boundsDict = window[kCGWindowBounds as String] as? [String: CGFloat],
+                  let ownerName = window[kCGWindowOwnerName as String] as? String,
+                  let cgWindowID = window[kCGWindowNumber as String] as? CGWindowID else {
+                continue
+            }
+            
+            let frame = CGRect(
+                x: boundsDict["X"] ?? 0,
+                y: boundsDict["Y"] ?? 0,
+                width: boundsDict["Width"] ?? 0,
+                height: boundsDict["Height"] ?? 0
+            )
+            
+            let windowID = getWindowIdentifier(appName: ownerName, windowID: cgWindowID)
+            
+            // このウィンドウがどの画面にあるか判定
+            for screen in screens {
+                if screen.frame.intersects(frame) {
+                    let displayID = getDisplayIdentifier(for: screen)
+                    snapshot[displayID]?[windowID] = frame
+                    savedCount += 1
+                    debugPrint("  保存: \(ownerName) @ (\(Int(frame.origin.x)), \(Int(frame.origin.y)))")
+                    break
+                }
+            }
+        }
+        
+        manualSnapshots[currentSlotIndex] = snapshot
+        debugPrint("📸 スナップショット保存完了: \(savedCount)個のウィンドウ")
+    }
+    
+    /// 手動スナップショットを復元
+    @objc func restoreManualSnapshot() {
+        debugPrint("📥 手動スナップショット復元を開始（スロット\(currentSlotIndex)）")
+        
+        let snapshot = manualSnapshots[currentSlotIndex]
+        
+        if snapshot.isEmpty || snapshot.values.allSatisfy({ $0.isEmpty }) {
+            debugPrint("  ⚠️ スナップショットが空です。先に保存してください。")
+            return
+        }
+        
+        let options = CGWindowListOption(arrayLiteral: .excludeDesktopElements, .optionOnScreenOnly)
+        guard let windowList = CGWindowListCopyWindowInfo(options, kCGNullWindowID) as? [[String: Any]] else {
+            debugPrint("  ❌ ウィンドウリストの取得に失敗")
+            return
+        }
+        
+        var restoredCount = 0
+        
+        // 各ディスプレイの保存データを処理
+        for (_, savedWindows) in snapshot {
+            for (savedWindowID, savedFrame) in savedWindows {
+                // windowIDからアプリ名とCGWindowIDを抽出
+                let components = savedWindowID.split(separator: "_")
+                guard components.count >= 2,
+                      let cgWindowID = UInt32(components[1]) else {
+                    continue
+                }
+                let appName = String(components[0])
+                
+                // 現在のウィンドウリストから該当するものを探す
+                for window in windowList {
+                    guard let ownerName = window[kCGWindowOwnerName as String] as? String,
+                          ownerName == appName,
+                          let currentCGWindowID = window[kCGWindowNumber as String] as? CGWindowID,
+                          currentCGWindowID == cgWindowID,
+                          let layer = window[kCGWindowLayer as String] as? Int,
+                          layer == 0,
+                          let boundsDict = window[kCGWindowBounds as String] as? [String: CGFloat],
+                          let ownerPID = window[kCGWindowOwnerPID as String] as? Int32 else {
+                        continue
+                    }
+                    
+                    let currentFrame = CGRect(
+                        x: boundsDict["X"] ?? 0,
+                        y: boundsDict["Y"] ?? 0,
+                        width: boundsDict["Width"] ?? 0,
+                        height: boundsDict["Height"] ?? 0
+                    )
+                    
+                    // 位置が変わっていない場合はスキップ
+                    if abs(currentFrame.origin.x - savedFrame.origin.x) < 5 &&
+                       abs(currentFrame.origin.y - savedFrame.origin.y) < 5 {
+                        continue
+                    }
+                    
+                    // Accessibility APIでウィンドウを移動
+                    let appRef = AXUIElementCreateApplication(ownerPID)
+                    var windowListRef: CFTypeRef?
+                    let result = AXUIElementCopyAttributeValue(appRef, kAXWindowsAttribute as CFString, &windowListRef)
+                    
+                    if result == .success, let windows = windowListRef as? [AXUIElement] {
+                        for axWindow in windows {
+                            var currentPosRef: CFTypeRef?
+                            if AXUIElementCopyAttributeValue(axWindow, kAXPositionAttribute as CFString, &currentPosRef) == .success,
+                               let currentPosValue = currentPosRef {
+                                var currentPoint = CGPoint.zero
+                                if AXValueGetValue(currentPosValue as! AXValue, .cgPoint, &currentPoint) {
+                                    // 現在の位置が現在のウィンドウ位置と一致するか確認
+                                    if abs(currentPoint.x - currentFrame.origin.x) < 10 &&
+                                       abs(currentPoint.y - currentFrame.origin.y) < 10 {
+                                        // 保存された座標に移動
+                                        var position = CGPoint(x: savedFrame.origin.x, y: savedFrame.origin.y)
+                                        if let positionValue = AXValueCreate(.cgPoint, &position) {
+                                            let setResult = AXUIElementSetAttributeValue(axWindow, kAXPositionAttribute as CFString, positionValue)
+                                            if setResult == .success {
+                                                restoredCount += 1
+                                                debugPrint("  ✅ \(appName) を (\(Int(savedFrame.origin.x)), \(Int(savedFrame.origin.y))) に復元")
+                                            }
+                                        }
+                                        break
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    break
+                }
+            }
+        }
+        
+        debugPrint("📥 スナップショット復元完了: \(restoredCount)個のウィンドウを移動")
+    }
+    
     /// 必要に応じてウィンドウを復元
     private func restoreWindowsIfNeeded() {
         debugPrint("🔄 ウィンドウ復元処理を開始...")
@@ -772,6 +958,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             UnregisterEventHotKey(hotKey)
         }
         if let hotKey = hotKeyRef2 {
+            UnregisterEventHotKey(hotKey)
+        }
+        if let hotKey = hotKeyRef3 {
+            UnregisterEventHotKey(hotKey)
+        }
+        if let hotKey = hotKeyRef4 {
             UnregisterEventHotKey(hotKey)
         }
         if let handler = eventHandler {

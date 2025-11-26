@@ -8,26 +8,44 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [Unreleased]
 
 ### Planned (v1.3.0)
-- **Manual Window Snapshot & Restore**: User-controlled window layout save/restore
-  - Configurable hotkeys for save and restore operations (default: Ctrl+Cmd+↑ for save, Ctrl+Cmd+↓ for restore)
-  - Independent snapshot storage separate from automatic restoration
-  - Visual notification feedback (success count, failure alerts)
-  - Menu bar commands for manual snapshot operations
+- **Manual Window Snapshot & Restore**: Enhanced features
+  - Visual notification feedback (screen flash, sound)
+  - Multiple snapshot slots with UI selection
+  - Persistent snapshot storage (UserDefaults)
   - Clear saved snapshot option
-  - Fallback solution when automatic restoration fails
+  - Snapshot management interface (list, delete, rename)
 - **Internationalization (i18n)**
   - English as default UI language
   - Japanese localization
   - Localized debug logs for international users
 
 ### Future Considerations (Post v1.3.0)
-- Multiple snapshot slots (save/restore multiple layouts)
-- Persistent snapshot storage (UserDefaults)
-- Snapshot management interface (list, delete, rename)
 - Per-app window restoration rules
 - Window size restoration (currently position only)
 - Support for more than 2 displays
 - Configurable snapshot interval
+
+## [1.2.3] - 2025-11-26
+
+### Added
+- **Manual Window Snapshot & Restore** (MVP implementation)
+  - Save current window layout: Ctrl+Cmd+↑ (uses existing modifier key settings)
+  - Restore saved layout: Ctrl+Cmd+↓ (uses existing modifier key settings)
+  - Menu bar commands for snapshot operations (📸 配置を保存 / 📥 配置を復元)
+  - Internal 5-slot structure prepared for future multi-slot expansion
+  - Independent from automatic display reconnection restoration
+
+### Limitations
+- Snapshots are stored in memory only and cleared when app exits
+- Windows that have been restarted cannot be restored (CGWindowID changes)
+- Fullscreen and minimized windows are not included in snapshots
+
+### Technical Details
+- Added `hotKeyRef3` (ID:3) and `hotKeyRef4` (ID:4) for up/down arrow keys
+- Implemented `manualSnapshots` array with 5 slots for future expansion
+- `saveManualSnapshot()` captures all on-screen windows with layer 0
+- `restoreManualSnapshot()` uses Accessibility API to reposition windows
+- Reuses existing `HotKeySettings` modifier configuration
 
 ## [1.2.2] - 2025-11-25
 
