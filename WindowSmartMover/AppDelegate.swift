@@ -30,6 +30,14 @@ private func hotKeyHandler(nextHandler: EventHandlerCallRef?, event: EventRef?, 
             appDelegate.saveManualSnapshot()
         case 4: // 下矢印(スナップショット復元)
             appDelegate.restoreManualSnapshot()
+        case 5: // W(ウィンドウを上に移動)
+            appDelegate.nudgeWindow(direction: .up)
+        case 6: // A(ウィンドウを左に移動)
+            appDelegate.nudgeWindow(direction: .left)
+        case 7: // S(ウィンドウを下に移動)
+            appDelegate.nudgeWindow(direction: .down)
+        case 8: // D(ウィンドウを右に移動)
+            appDelegate.nudgeWindow(direction: .right)
         default:
             break
         }
@@ -117,6 +125,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     var hotKeyRef2: EventHotKeyRef?
     var hotKeyRef3: EventHotKeyRef?  // スナップショット保存（↑）
     var hotKeyRef4: EventHotKeyRef?  // スナップショット復元（↓）
+    var hotKeyRef5: EventHotKeyRef?  // ウィンドウ微調整（W: 上）
+    var hotKeyRef6: EventHotKeyRef?  // ウィンドウ微調整（A: 左）
+    var hotKeyRef7: EventHotKeyRef?  // ウィンドウ微調整（S: 下）
+    var hotKeyRef8: EventHotKeyRef?  // ウィンドウ微調整（D: 右）
     var eventHandler: EventHandlerRef?
     var settingsWindow: NSWindow?
     var aboutWindow: NSWindow?
@@ -351,6 +363,54 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         } else {
             debugPrint("❌ ホットキー4の登録失敗: \(registerStatus4)")
         }
+        
+        // 5つ目のホットキー: ウィンドウ微調整・上 (W)
+        let hotKeyID5 = EventHotKeyID(signature: OSType(0x4D4F5645), id: 5) // 'MOVE' + 5
+        let keyCode5 = UInt32(kVK_ANSI_W)
+        let registerStatus5 = RegisterEventHotKey(keyCode5, modifiers, hotKeyID5, GetApplicationEventTarget(), 0, &hotKeyRef5)
+        
+        if registerStatus5 == noErr {
+            let modifierString = settings.getModifierString()
+            debugPrint("✅ ホットキー5 (\(modifierString)W) の登録成功")
+        } else {
+            debugPrint("❌ ホットキー5の登録失敗: \(registerStatus5)")
+        }
+        
+        // 6つ目のホットキー: ウィンドウ微調整・左 (A)
+        let hotKeyID6 = EventHotKeyID(signature: OSType(0x4D4F5645), id: 6) // 'MOVE' + 6
+        let keyCode6 = UInt32(kVK_ANSI_A)
+        let registerStatus6 = RegisterEventHotKey(keyCode6, modifiers, hotKeyID6, GetApplicationEventTarget(), 0, &hotKeyRef6)
+        
+        if registerStatus6 == noErr {
+            let modifierString = settings.getModifierString()
+            debugPrint("✅ ホットキー6 (\(modifierString)A) の登録成功")
+        } else {
+            debugPrint("❌ ホットキー6の登録失敗: \(registerStatus6)")
+        }
+        
+        // 7つ目のホットキー: ウィンドウ微調整・下 (S)
+        let hotKeyID7 = EventHotKeyID(signature: OSType(0x4D4F5645), id: 7) // 'MOVE' + 7
+        let keyCode7 = UInt32(kVK_ANSI_S)
+        let registerStatus7 = RegisterEventHotKey(keyCode7, modifiers, hotKeyID7, GetApplicationEventTarget(), 0, &hotKeyRef7)
+        
+        if registerStatus7 == noErr {
+            let modifierString = settings.getModifierString()
+            debugPrint("✅ ホットキー7 (\(modifierString)S) の登録成功")
+        } else {
+            debugPrint("❌ ホットキー7の登録失敗: \(registerStatus7)")
+        }
+        
+        // 8つ目のホットキー: ウィンドウ微調整・右 (D)
+        let hotKeyID8 = EventHotKeyID(signature: OSType(0x4D4F5645), id: 8) // 'MOVE' + 8
+        let keyCode8 = UInt32(kVK_ANSI_D)
+        let registerStatus8 = RegisterEventHotKey(keyCode8, modifiers, hotKeyID8, GetApplicationEventTarget(), 0, &hotKeyRef8)
+        
+        if registerStatus8 == noErr {
+            let modifierString = settings.getModifierString()
+            debugPrint("✅ ホットキー8 (\(modifierString)D) の登録成功")
+        } else {
+            debugPrint("❌ ホットキー8の登録失敗: \(registerStatus8)")
+        }
     }
     
     @objc func moveWindowToNextScreen() {
@@ -364,6 +424,77 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     enum Direction {
         case next
         case prev
+    }
+    
+    enum NudgeDirection {
+        case up
+        case down
+        case left
+        case right
+    }
+    
+    /// ウィンドウを微調整（指定方向にピクセル単位で移動）
+    func nudgeWindow(direction: NudgeDirection) {
+        let pixels = HotKeySettings.shared.nudgePixels
+        let directionName: String
+        switch direction {
+        case .up: directionName = "上"
+        case .down: directionName = "下"
+        case .left: directionName = "左"
+        case .right: directionName = "右"
+        }
+        debugPrint("📐 ウィンドウを\(directionName)に\(pixels)px移動")
+        
+        // フロントのアプリケーションを取得
+        guard let frontApp = NSWorkspace.shared.frontmostApplication else {
+            debugPrint("❌ フロントアプリの取得に失敗しました")
+            return
+        }
+        
+        // Accessibility APIでウィンドウを取得
+        let appRef = AXUIElementCreateApplication(frontApp.processIdentifier)
+        var windowRef: AnyObject?
+        let result = AXUIElementCopyAttributeValue(appRef, kAXFocusedWindowAttribute as CFString, &windowRef)
+        
+        guard result == .success, let window = windowRef else {
+            debugPrint("❌ フォーカスされたウィンドウの取得に失敗しました")
+            return
+        }
+        
+        // 現在の位置を取得
+        var positionRef: AnyObject?
+        AXUIElementCopyAttributeValue(window as! AXUIElement, kAXPositionAttribute as CFString, &positionRef)
+        
+        guard let positionValue = positionRef else {
+            debugPrint("❌ ウィンドウの位置の取得に失敗しました")
+            return
+        }
+        
+        var position = CGPoint.zero
+        AXValueGetValue(positionValue as! AXValue, .cgPoint, &position)
+        
+        // 新しい位置を計算
+        var newPosition = position
+        switch direction {
+        case .up:
+            newPosition.y -= CGFloat(pixels)
+        case .down:
+            newPosition.y += CGFloat(pixels)
+        case .left:
+            newPosition.x -= CGFloat(pixels)
+        case .right:
+            newPosition.x += CGFloat(pixels)
+        }
+        
+        // 位置を更新
+        if let newPositionValue = AXValueCreate(.cgPoint, &newPosition) {
+            let setResult = AXUIElementSetAttributeValue(window as! AXUIElement, kAXPositionAttribute as CFString, newPositionValue)
+            if setResult == .success {
+                debugPrint("✅ ウィンドウを (\(Int(newPosition.x)), \(Int(newPosition.y))) に移動")
+            } else {
+                debugPrint("❌ ウィンドウの移動に失敗: \(setResult.rawValue)")
+            }
+        }
     }
     
     func moveWindow(direction: Direction) {
@@ -1167,6 +1298,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             }
         }
         
+        // 既存データ保護チェック
+        let snapshotSettings = SnapshotSettings.shared
+        if snapshotSettings.protectExistingSnapshot && ManualSnapshotStorage.shared.hasSnapshot {
+            if savedCount < snapshotSettings.minimumWindowCount {
+                debugPrint("🛡️ 既存データ保護: ウィンドウ数が\(savedCount)個（最小\(snapshotSettings.minimumWindowCount)個）のため上書きをスキップ")
+                return
+            }
+        }
+        
         manualSnapshots[currentSlotIndex] = snapshot
         
         // 永続化
@@ -1215,6 +1355,18 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             UnregisterEventHotKey(hotKey)
         }
         if let hotKey = hotKeyRef4 {
+            UnregisterEventHotKey(hotKey)
+        }
+        if let hotKey = hotKeyRef5 {
+            UnregisterEventHotKey(hotKey)
+        }
+        if let hotKey = hotKeyRef6 {
+            UnregisterEventHotKey(hotKey)
+        }
+        if let hotKey = hotKeyRef7 {
+            UnregisterEventHotKey(hotKey)
+        }
+        if let hotKey = hotKeyRef8 {
             UnregisterEventHotKey(hotKey)
         }
         if let handler = eventHandler {

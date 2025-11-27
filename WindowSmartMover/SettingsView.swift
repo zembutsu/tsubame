@@ -18,12 +18,19 @@ class HotKeySettings: ObservableObject {
         didSet { UserDefaults.standard.set(useCommand, forKey: "useCommand") }
     }
     
+    /// ウィンドウ微調整のピクセル数（10-500、デフォルト100）
+    @Published var nudgePixels: Int {
+        didSet { UserDefaults.standard.set(nudgePixels, forKey: "nudgePixels") }
+    }
+    
     private init() {
         // デフォルト値: Ctrl + Option + Command
         self.useControl = UserDefaults.standard.object(forKey: "useControl") as? Bool ?? true
         self.useOption = UserDefaults.standard.object(forKey: "useOption") as? Bool ?? true
         self.useShift = UserDefaults.standard.object(forKey: "useShift") as? Bool ?? false
         self.useCommand = UserDefaults.standard.object(forKey: "useCommand") as? Bool ?? true
+        // デフォルト値: 100ピクセル
+        self.nudgePixels = UserDefaults.standard.object(forKey: "nudgePixels") as? Int ?? 100
     }
     
     func getModifiers() -> UInt32 {
@@ -231,10 +238,29 @@ class SnapshotSettings: ObservableObject {
         }
     }
     
+    /// 既存スナップショット保護（ウィンドウ数が少ない場合は上書きしない）
+    @Published var protectExistingSnapshot: Bool {
+        didSet {
+            defaults.set(protectExistingSnapshot, forKey: protectExistingKey)
+        }
+    }
+    
+    /// 保護時の最小ウィンドウ数
+    @Published var minimumWindowCount: Int {
+        didSet {
+            defaults.set(minimumWindowCount, forKey: minimumWindowCountKey)
+        }
+    }
+    
+    private let protectExistingKey = "snapshotProtectExisting"
+    private let minimumWindowCountKey = "snapshotMinimumWindowCount"
+    
     private init() {
-        self.initialSnapshotDelay = defaults.object(forKey: initialDelayKey) as? Double ?? 5.0
+        self.initialSnapshotDelay = defaults.object(forKey: initialDelayKey) as? Double ?? 15.0
         self.enablePeriodicSnapshot = defaults.object(forKey: enablePeriodicKey) as? Bool ?? false
         self.periodicSnapshotInterval = defaults.object(forKey: periodicIntervalKey) as? Double ?? 30.0
+        self.protectExistingSnapshot = defaults.object(forKey: protectExistingKey) as? Bool ?? true
+        self.minimumWindowCount = defaults.object(forKey: minimumWindowCountKey) as? Int ?? 3
     }
     
     /// 初回遅延を秒単位で取得
@@ -351,297 +377,44 @@ struct SettingsView: View {
     @ObservedObject var timingSettings = WindowTimingSettings.shared
     @ObservedObject var snapshotSettings = SnapshotSettings.shared
     @Environment(\.dismiss) var dismiss
+    @State private var selectedTab = 0
     
     var body: some View {
-        VStack(spacing: 20) {
+        VStack(spacing: 16) {
             Text("設定")
                 .font(.title)
                 .padding(.top)
             
-            // ショートカットキー設定セクション
-            VStack(alignment: .leading, spacing: 12) {
-                Text("ショートカットキー")
-                    .font(.headline)
-                
-                Text("修飾キーを選択してください：")
-                    .font(.subheadline)
-                
-                Toggle("⌃ Control", isOn: $settings.useControl)
-                Toggle("⌥ Option", isOn: $settings.useOption)
-                Toggle("⇧ Shift", isOn: $settings.useShift)
-                Toggle("⌘ Command", isOn: $settings.useCommand)
+            // タブ選択
+            Picker("", selection: $selectedTab) {
+                Text("Basic").tag(0)
+                Text("Advanced").tag(1)
             }
-            .padding()
-            .background(Color.gray.opacity(0.1))
-            .cornerRadius(8)
+            .pickerStyle(.segmented)
+            .padding(.horizontal)
             
-            VStack(alignment: .leading, spacing: 8) {
-                Text("現在のショートカット：")
-                    .font(.subheadline)
-                HStack {
-                    Text("\(settings.getModifierString())→")
-                        .font(.title2)
-                        .foregroundColor(.blue)
-                    Text("次の画面へ")
-                        .font(.body)
-                }
-                HStack {
-                    Text("\(settings.getModifierString())←")
-                        .font(.title2)
-                        .foregroundColor(.blue)
-                    Text("前の画面へ")
-                        .font(.body)
-                }
-            }
-            .padding()
-            
-            // ウィンドウ復元タイミング設定セクション
-            VStack(alignment: .leading, spacing: 12) {
-                Text("ウィンドウ復元タイミング")
-                    .font(.headline)
-                
-                // ディスプレイ変更の落ち着き待ち時間
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack {
-                        Text("ディスプレイ変更検出の安定化時間:")
-                            .font(.subheadline)
-                        Spacer()
-                        Text(String(format: "%.1f秒", timingSettings.displayStabilizationDelay))
-                            .foregroundColor(.blue)
-                            .fontWeight(.semibold)
-                    }
-                    
-                    Slider(value: $timingSettings.displayStabilizationDelay, in: 0.1...15.0, step: 0.1)
-                    
-                    Text("サスペンド復帰時など、ディスプレイ変更イベントが連続して発生した際に、変更が落ち着くまで待つ時間です。復元処理が早すぎる場合は、この値を大きくしてください。")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                .padding(.bottom, 8)
-                
-                Divider()
-                
-                // ディスプレイ接続後の待機時間
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack {
-                        Text("ディスプレイ接続後の待機時間:")
-                            .font(.subheadline)
-                        Spacer()
-                        Text(String(format: "%.1f秒", timingSettings.windowRestoreDelay))
-                            .foregroundColor(.blue)
-                            .fontWeight(.semibold)
-                    }
-                    
-                    Slider(value: $timingSettings.windowRestoreDelay, in: 0.1...15.0, step: 0.1)
-                    
-                    Text("外部ディスプレイを接続した際に、macOSがウィンドウ座標を更新し終わるまでの待機時間です。ウィンドウが正しく復元されない場合は、この値を大きくしてください。")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                .padding(.bottom, 8)
-                
-                Divider()
-                
-                // ディスプレイ記憶用監視間隔
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack {
-                        Text("ウィンドウ位置の監視間隔:")
-                            .font(.subheadline)
-                        Spacer()
-                        Text(String(format: "%.0f秒", timingSettings.displayMemoryInterval))
-                            .foregroundColor(.blue)
-                            .fontWeight(.semibold)
-                    }
-                    
-                    Slider(value: $timingSettings.displayMemoryInterval, in: 1.0...30.0, step: 1.0)
-                    
-                    Text("ディスプレイ再接続時の自動復元用に、ウィンドウ位置を記録する間隔です。短いほど正確ですが、CPU負荷が増えます。")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-            }
-            .padding()
-            .background(Color.gray.opacity(0.1))
-            .cornerRadius(8)
-            
-            // スリープ情報セクション（デバッグ）
-            VStack(alignment: .leading, spacing: 12) {
-                Text("スリープ時の動作設定")
-                    .font(.headline)
-                
-                Toggle("スリープ中はディスプレイ監視を一時停止", isOn: $timingSettings.disableMonitoringDuringSleep)
-                    .toggleStyle(SwitchToggleStyle())
-                
-                Text("有効にすると、スリープ中に発生するディスプレイ変更イベントを無視します。Dock位置ずれ問題の軽減に役立つ可能性があります。")
-                    .font(.caption)
-                    .foregroundColor(.secondary)
-                    .fixedSize(horizontal: false, vertical: true)
-                    .padding(.bottom, 8)
-                
-                Divider()
-                
-                Text("デバッグ情報")
-                    .font(.subheadline)
-                    .fontWeight(.semibold)
-                
-                if timingSettings.sleepDurationHours > 0 {
-                    HStack {
-                        Text("前回のスリープ:")
-                            .font(.subheadline)
-                        Spacer()
-                        Text(String(format: "%.2f時間", timingSettings.sleepDurationHours))
-                            .foregroundColor(.blue)
-                            .fontWeight(.semibold)
-                    }
-                    
-                    HStack {
-                        Text("調整後の待機時間:")
-                            .font(.subheadline)
-                        Spacer()
-                        Text(String(format: "%.1f秒", timingSettings.getAdjustedDisplayDelay()))
-                            .foregroundColor(.green)
-                            .fontWeight(.semibold)
-                    }
-                    
-                    HStack {
-                        Text("監視状態:")
-                            .font(.subheadline)
-                        Spacer()
-                        Text(timingSettings.isMonitoringEnabled ? "有効" : "一時停止中")
-                            .foregroundColor(timingSettings.isMonitoringEnabled ? .green : .orange)
-                            .fontWeight(.semibold)
-                    }
-                    
-                    if let wakeTime = timingSettings.lastWakeTime {
-                        Text("最終復帰: \(wakeTime.formatted(date: .omitted, time: .standard))")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                    }
+            // タブコンテンツ
+            ScrollView {
+                if selectedTab == 0 {
+                    basicSettingsContent
                 } else {
-                    Text("スリープ情報なし")
-                        .font(.subheadline)
-                        .foregroundColor(.secondary)
+                    advancedSettingsContent
                 }
             }
-            .padding()
-            .background(Color.gray.opacity(0.1))
-            .cornerRadius(8)
             
-            // 自動スナップショット設定セクション
-            VStack(alignment: .leading, spacing: 12) {
-                Text("自動スナップショット")
-                    .font(.headline)
-                
-                // 初回スナップショット遅延
-                VStack(alignment: .leading, spacing: 8) {
-                    HStack {
-                        Text("起動後/ディスプレイ認識後の初回取得:")
-                            .font(.subheadline)
-                        Spacer()
-                        Text(formatMinutes(snapshotSettings.initialSnapshotDelay))
-                            .foregroundColor(.blue)
-                            .fontWeight(.semibold)
-                    }
-                    
-                    Slider(value: $snapshotSettings.initialSnapshotDelay, in: 0.5...60.0, step: 0.5)
-                    
-                    Text("アプリ起動後または外部ディスプレイ認識安定後に、自動でスナップショットを取得するまでの時間です。")
-                        .font(.caption)
-                        .foregroundColor(.secondary)
-                        .fixedSize(horizontal: false, vertical: true)
-                }
-                .padding(.bottom, 8)
-                
-                Divider()
-                
-                // 定期スナップショット
-                VStack(alignment: .leading, spacing: 8) {
-                    Toggle("定期的にスナップショットを自動取得", isOn: $snapshotSettings.enablePeriodicSnapshot)
-                        .toggleStyle(SwitchToggleStyle())
-                    
-                    if snapshotSettings.enablePeriodicSnapshot {
-                        HStack {
-                            Text("取得間隔:")
-                                .font(.subheadline)
-                            Spacer()
-                            Text(formatMinutes(snapshotSettings.periodicSnapshotInterval))
-                                .foregroundColor(.blue)
-                                .fontWeight(.semibold)
-                        }
-                        
-                        Slider(value: $snapshotSettings.periodicSnapshotInterval, in: 5.0...360.0, step: 5.0)
-                        
-                        Text("初回取得後、指定した間隔で自動的にスナップショットを更新します。")
-                            .font(.caption)
-                            .foregroundColor(.secondary)
-                            .fixedSize(horizontal: false, vertical: true)
-                    }
-                }
-                .padding(.bottom, 8)
-                
-                Divider()
-                
-                // スナップショット情報
-                VStack(alignment: .leading, spacing: 4) {
-                    Text("保存状態")
-                        .font(.subheadline)
-                        .fontWeight(.semibold)
-                    
-                    if let timestamp = ManualSnapshotStorage.shared.getTimestamp() {
-                        HStack {
-                            Image(systemName: "checkmark.circle.fill")
-                                .foregroundColor(.green)
-                            Text("最終保存: \(timestamp.formatted(date: .abbreviated, time: .standard))")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        }
-                    } else {
-                        HStack {
-                            Image(systemName: "xmark.circle")
-                                .foregroundColor(.orange)
-                            Text("保存されたスナップショットはありません")
-                                .font(.caption)
-                                .foregroundColor(.secondary)
-                        }
-                    }
-                    
-                    Button("保存済みスナップショットをクリア") {
-                        ManualSnapshotStorage.shared.clear()
-                        // AppDelegateにクリアを通知
-                        NotificationCenter.default.post(
-                            name: Notification.Name("ClearManualSnapshot"),
-                            object: nil
-                        )
-                    }
-                    .font(.caption)
-                    .disabled(!ManualSnapshotStorage.shared.hasSnapshot)
-                }
-            }
-            .padding()
-            .background(Color.gray.opacity(0.1))
-            .cornerRadius(8)
+            Divider()
             
-            Text("⚠️ 設定を変更したらアプリを再起動してください")
-                .font(.caption)
-                .foregroundColor(.orange)
-            
+            // フッター
             HStack {
                 Button("デフォルトに戻す") {
-                    settings.useControl = true
-                    settings.useOption = true
-                    settings.useShift = false
-                    settings.useCommand = true
-                    timingSettings.displayStabilizationDelay = 6.0
-                    timingSettings.windowRestoreDelay = 6.0
-                    timingSettings.disableMonitoringDuringSleep = true
-                    timingSettings.displayMemoryInterval = 5.0
-                    snapshotSettings.initialSnapshotDelay = 5.0
-                    snapshotSettings.enablePeriodicSnapshot = false
-                    snapshotSettings.periodicSnapshotInterval = 30.0
+                    resetToDefaults()
                 }
+                
+                Spacer()
+                
+                Text("⚠️ 一部の設定は再起動が必要")
+                    .font(.caption)
+                    .foregroundColor(.orange)
                 
                 Spacer()
                 
@@ -650,13 +423,315 @@ struct SettingsView: View {
                 }
                 .keyboardShortcut(.defaultAction)
             }
+            .padding(.horizontal)
             .padding(.bottom)
         }
         .padding()
-        .frame(width: 500, height: 1280)
+        .frame(width: 520, height: 620)
     }
     
-    // 分単位の時間をフォーマット
+    // MARK: - Basic Settings Tab
+    
+    private var basicSettingsContent: some View {
+        VStack(spacing: 16) {
+            // ショートカットキー設定
+            GroupBox(label: Text("ショートカットキー").font(.headline)) {
+                VStack(alignment: .leading, spacing: 10) {
+                    Text("修飾キーを選択：")
+                        .font(.subheadline)
+                        .foregroundColor(.secondary)
+                    
+                    HStack(spacing: 20) {
+                        Toggle("⌃ Control", isOn: $settings.useControl)
+                        Toggle("⌥ Option", isOn: $settings.useOption)
+                    }
+                    HStack(spacing: 20) {
+                        Toggle("⇧ Shift", isOn: $settings.useShift)
+                        Toggle("⌘ Command", isOn: $settings.useCommand)
+                    }
+                    
+                    Divider()
+                    
+                    // 現在のショートカット
+                    HStack(spacing: 30) {
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("画面間移動：")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                            HStack {
+                                Text("\(settings.getModifierString())→←")
+                                    .font(.system(.body, design: .monospaced))
+                                    .foregroundColor(.blue)
+                            }
+                        }
+                        VStack(alignment: .leading, spacing: 4) {
+                            Text("スナップショット：")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                            HStack {
+                                Text("\(settings.getModifierString())↑↓")
+                                    .font(.system(.body, design: .monospaced))
+                                    .foregroundColor(.blue)
+                            }
+                        }
+                    }
+                }
+                .padding(.vertical, 8)
+            }
+            
+            // ウィンドウ位置微調整
+            GroupBox(label: Text("ウィンドウ位置微調整").font(.headline)) {
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack(spacing: 16) {
+                        VStack(spacing: 2) {
+                            Text("\(settings.getModifierString())W")
+                                .font(.system(.caption, design: .monospaced))
+                                .foregroundColor(.blue)
+                            Text("↑").font(.caption2)
+                        }
+                        VStack(spacing: 2) {
+                            Text("\(settings.getModifierString())S")
+                                .font(.system(.caption, design: .monospaced))
+                                .foregroundColor(.blue)
+                            Text("↓").font(.caption2)
+                        }
+                        VStack(spacing: 2) {
+                            Text("\(settings.getModifierString())A")
+                                .font(.system(.caption, design: .monospaced))
+                                .foregroundColor(.blue)
+                            Text("←").font(.caption2)
+                        }
+                        VStack(spacing: 2) {
+                            Text("\(settings.getModifierString())D")
+                                .font(.system(.caption, design: .monospaced))
+                                .foregroundColor(.blue)
+                            Text("→").font(.caption2)
+                        }
+                        
+                        Spacer()
+                        
+                        HStack {
+                            Text("移動量:")
+                                .font(.subheadline)
+                            Stepper(value: $settings.nudgePixels, in: 10...500, step: 10) {
+                                Text("\(settings.nudgePixels) px")
+                                    .foregroundColor(.blue)
+                                    .fontWeight(.semibold)
+                                    .frame(width: 55, alignment: .trailing)
+                            }
+                        }
+                    }
+                }
+                .padding(.vertical, 8)
+            }
+            
+            // 自動スナップショット
+            GroupBox(label: Text("自動スナップショット").font(.headline)) {
+                VStack(alignment: .leading, spacing: 10) {
+                    HStack {
+                        Text("初回取得までの時間:")
+                            .font(.subheadline)
+                        Spacer()
+                        Stepper(value: $snapshotSettings.initialSnapshotDelay, in: 0.5...60.0, step: 0.5) {
+                            Text(formatMinutes(snapshotSettings.initialSnapshotDelay))
+                                .foregroundColor(.blue)
+                                .fontWeight(.semibold)
+                                .frame(width: 65, alignment: .trailing)
+                        }
+                    }
+                    
+                    Toggle("定期的に自動取得", isOn: $snapshotSettings.enablePeriodicSnapshot)
+                    
+                    if snapshotSettings.enablePeriodicSnapshot {
+                        HStack {
+                            Text("取得間隔:")
+                                .font(.subheadline)
+                            Spacer()
+                            Stepper(value: $snapshotSettings.periodicSnapshotInterval, in: 5.0...360.0, step: 5.0) {
+                                Text(formatMinutes(snapshotSettings.periodicSnapshotInterval))
+                                    .foregroundColor(.blue)
+                                    .fontWeight(.semibold)
+                                    .frame(width: 80, alignment: .trailing)
+                            }
+                        }
+                    }
+                    
+                    Divider()
+                    
+                    Toggle("既存データを保護", isOn: $snapshotSettings.protectExistingSnapshot)
+                    
+                    if snapshotSettings.protectExistingSnapshot {
+                        HStack {
+                            Text("最小ウィンドウ数:")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                            Stepper(value: $snapshotSettings.minimumWindowCount, in: 1...10) {
+                                Text("\(snapshotSettings.minimumWindowCount)")
+                                    .foregroundColor(.blue)
+                                    .frame(width: 25, alignment: .trailing)
+                            }
+                            Text("個未満は上書きしない")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                    }
+                    
+                    Divider()
+                    
+                    // 保存状態
+                    HStack {
+                        if let timestamp = ManualSnapshotStorage.shared.getTimestamp() {
+                            Image(systemName: "checkmark.circle.fill")
+                                .foregroundColor(.green)
+                            Text("最終保存: \(timestamp.formatted(date: .abbreviated, time: .shortened))")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        } else {
+                            Image(systemName: "xmark.circle")
+                                .foregroundColor(.orange)
+                            Text("保存データなし")
+                                .font(.caption)
+                                .foregroundColor(.secondary)
+                        }
+                        
+                        Spacer()
+                        
+                        Button("クリア") {
+                            ManualSnapshotStorage.shared.clear()
+                            NotificationCenter.default.post(
+                                name: Notification.Name("ClearManualSnapshot"),
+                                object: nil
+                            )
+                        }
+                        .font(.caption)
+                        .disabled(!ManualSnapshotStorage.shared.hasSnapshot)
+                    }
+                }
+                .padding(.vertical, 8)
+            }
+        }
+        .padding(.horizontal)
+    }
+    
+    // MARK: - Advanced Settings Tab
+    
+    private var advancedSettingsContent: some View {
+        VStack(spacing: 16) {
+            // ウィンドウ復元タイミング
+            GroupBox(label: Text("ウィンドウ復元タイミング").font(.headline)) {
+                VStack(alignment: .leading, spacing: 12) {
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack {
+                            Text("ディスプレイ変更検出の安定化時間:")
+                                .font(.subheadline)
+                            Spacer()
+                            Text(String(format: "%.1f秒", timingSettings.displayStabilizationDelay))
+                                .foregroundColor(.blue)
+                                .fontWeight(.semibold)
+                        }
+                        Slider(value: $timingSettings.displayStabilizationDelay, in: 0.1...15.0, step: 0.1)
+                        Text("ディスプレイ変更イベントが落ち着くまでの待機時間")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    
+                    Divider()
+                    
+                    VStack(alignment: .leading, spacing: 6) {
+                        HStack {
+                            Text("ディスプレイ接続後の待機時間:")
+                                .font(.subheadline)
+                            Spacer()
+                            Text(String(format: "%.1f秒", timingSettings.windowRestoreDelay))
+                                .foregroundColor(.blue)
+                                .fontWeight(.semibold)
+                        }
+                        Slider(value: $timingSettings.windowRestoreDelay, in: 0.1...15.0, step: 0.1)
+                        Text("macOSがウィンドウ座標を更新し終わるまでの待機時間")
+                            .font(.caption)
+                            .foregroundColor(.secondary)
+                    }
+                    
+                    Divider()
+                    
+                    HStack {
+                        Text("ウィンドウ位置の監視間隔:")
+                            .font(.subheadline)
+                        Spacer()
+                        Stepper(value: $timingSettings.displayMemoryInterval, in: 1.0...30.0, step: 1.0) {
+                            Text("\(Int(timingSettings.displayMemoryInterval))秒")
+                                .foregroundColor(.blue)
+                                .fontWeight(.semibold)
+                                .frame(width: 45, alignment: .trailing)
+                        }
+                    }
+                    Text("ディスプレイ再接続時の自動復元用")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                .padding(.vertical, 8)
+            }
+            
+            // スリープ時の動作設定
+            GroupBox(label: Text("スリープ時の動作").font(.headline)) {
+                VStack(alignment: .leading, spacing: 10) {
+                    Toggle("スリープ中はディスプレイ監視を一時停止", isOn: $timingSettings.disableMonitoringDuringSleep)
+                    
+                    Text("スリープ中のディスプレイ変更イベントを無視します")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    
+                    if timingSettings.sleepDurationHours > 0 {
+                        Divider()
+                        
+                        HStack {
+                            Text("前回のスリープ:")
+                                .font(.caption)
+                            Text(String(format: "%.1f時間", timingSettings.sleepDurationHours))
+                                .font(.caption)
+                                .foregroundColor(.blue)
+                            Spacer()
+                            Text("調整後の待機:")
+                                .font(.caption)
+                            Text(String(format: "%.1f秒", timingSettings.getAdjustedDisplayDelay()))
+                                .font(.caption)
+                                .foregroundColor(.green)
+                        }
+                        
+                        HStack {
+                            Text("監視状態:")
+                                .font(.caption)
+                            Text(timingSettings.isMonitoringEnabled ? "有効" : "一時停止中")
+                                .font(.caption)
+                                .foregroundColor(timingSettings.isMonitoringEnabled ? .green : .orange)
+                        }
+                    }
+                }
+                .padding(.vertical, 8)
+            }
+        }
+        .padding(.horizontal)
+    }
+    
+    // MARK: - Helper Functions
+    
+    private func resetToDefaults() {
+        settings.useControl = true
+        settings.useOption = true
+        settings.useShift = false
+        settings.useCommand = true
+        settings.nudgePixels = 100
+        timingSettings.displayStabilizationDelay = 6.0
+        timingSettings.windowRestoreDelay = 6.0
+        timingSettings.disableMonitoringDuringSleep = true
+        timingSettings.displayMemoryInterval = 5.0
+        snapshotSettings.initialSnapshotDelay = 15.0
+        snapshotSettings.enablePeriodicSnapshot = false
+        snapshotSettings.periodicSnapshotInterval = 30.0
+        snapshotSettings.protectExistingSnapshot = true
+        snapshotSettings.minimumWindowCount = 3
+    }
+    
     private func formatMinutes(_ minutes: Double) -> String {
         if minutes >= 60 {
             let hours = Int(minutes) / 60

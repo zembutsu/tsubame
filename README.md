@@ -25,7 +25,7 @@ A lightweight macOS menu bar app for effortless window management across multipl
 - **Menu Bar Integration**: Lightweight, stays out of your way
 
 ### Display Memory (v1.1+)
-- **Automatic Position Saving**: Remembers window positions every 5 seconds
+- **Automatic Position Saving**: Remembers window positions periodically (configurable: 1-30 sec, default 5 sec)
 - **Smart Restoration**: Automatically restores windows when external displays reconnect
 - **Sleep/Wake Support**: Works seamlessly after waking from sleep
 - **Multi-Window Support**: Handles multiple windows per app individually
@@ -51,13 +51,27 @@ A lightweight macOS menu bar app for effortless window management across multipl
 
 ### Auto Snapshot & Persistence (v1.2.4+)
 - **Automatic Snapshot**: Never forget to save your layout
-  - Initial snapshot taken automatically after app launch (configurable: 0.5-60 min, default 5 min)
+  - Initial snapshot taken automatically after app launch (configurable: 0.5-60 min, default 15 min)
   - Also triggers after external display reconnection
   - Optional periodic snapshots (configurable: 5 min - 6 hours, default 30 min)
 - **Persistent Storage**: Snapshots survive restarts
   - Saved to UserDefaults, persists across app/macOS restarts
   - Clear saved data option in Settings
   - Last save timestamp displayed
+- **Existing Data Protection**: Prevents accidental data loss
+  - Skips auto-snapshot if window count is below threshold (default: 3)
+  - Protects previous layout during system startup
+
+### Window Nudge (v1.2.4+)
+- **Pixel-Perfect Positioning**: Fine-tune window position without mouse/trackpad
+  - `⌃⌘W` Move up
+  - `⌃⌘A` Move left
+  - `⌃⌘S` Move down
+  - `⌃⌘D` Move right
+- **Configurable Step Size**: 10-500 pixels (default 100 px)
+- **Keyboard-Only Workflow**: Complete window management without touching the trackpad
+
+> 💡 **Design Note**: This feature was inspired by "Tsubame" (燕/swallow) - the app's codename. The swift, agile movements of 燕返し (tsubame-gaeshi) suggested that window management should be equally nimble. Moving windows between screens is one thing, but fine-tuning their position should also be keyboard-driven. No more reaching for the trackpad just to nudge a window "a bit to the right." — *Zem, 2025-11-27*
 
 ### Coming Soon (v1.3.0) 🚧
 
@@ -267,6 +281,10 @@ No sensitive information is logged or transmitted.
 - [x] Persistent snapshot storage (UserDefaults)
 - [x] Auto-snapshot settings UI
 - [x] Post-display-reconnection snapshot scheduling
+- [x] Window nudge feature (WASD keys for pixel-level positioning)
+- [x] Settings UI improved with Steppers
+- [x] Settings UI reorganized with Basic/Advanced tabs
+- [x] Existing data protection (prevents overwrite with low window count)
 
 ### Completed (v1.2.3)
 - [x] Manual window snapshot & restore (MVP)

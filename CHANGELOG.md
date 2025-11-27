@@ -26,7 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 - **Automatic Snapshot Feature**
-  - Initial auto-snapshot after app launch or display recognition (configurable: 0.5-60 min, default 5 min)
+  - Initial auto-snapshot after app launch or display recognition (configurable: 0.5-60 min, default 15 min)
   - Optional periodic auto-snapshot (configurable: 5-360 min / 6 hours, default 30 min)
   - Settings UI for all auto-snapshot configurations
 - **Snapshot Persistence** (UserDefaults)
@@ -34,31 +34,42 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Automatic loading of saved snapshots on app launch
   - Clear saved snapshot option in Settings
   - Timestamp display showing last save time
+- **Existing Data Protection**
+  - Prevents auto-snapshot from overwriting when window count is too low
+  - Configurable minimum window threshold (default: 3 windows)
+  - Protects against data loss during system startup
 - **Display Memory Interval Setting**
   - Configurable window position monitoring interval (1-30 sec, default 5 sec)
   - Used for automatic window restoration on display reconnection
   - Real-time update without app restart
+- **Window Nudge Feature** (Pixel-level positioning)
+  - Move focused window by configurable pixels (10-500 px, default 100 px)
+  - Keyboard shortcuts: `⌃⌘W` (up), `⌃⌘A` (left), `⌃⌘S` (down), `⌃⌘D` (right)
+  - Eliminates need for trackpad/mouse for fine positioning after screen moves
 
 ### Changed
-- Settings window height increased to accommodate new sections
-- Snapshot save now automatically persists to UserDefaults
-- Improved log messages to distinguish between different snapshot systems:
-  - "ディスプレイ記憶用の定期監視" for display reconnection restoration
-  - "自動スナップショット" for user-triggered manual restoration
+- **Settings UI reorganized with tabs**
+  - Basic tab: Shortcuts, Window Nudge, Auto Snapshot
+  - Advanced tab: Restore Timing, Sleep Settings
+  - Compact 520x620 window size (no more scrolling/cut-off)
+- Default initial snapshot delay increased from 5 min to 15 min
+- Settings window UI improved: Sliders replaced with Steppers for most settings
+- Improved log messages to distinguish between different snapshot systems
 - Timer implementation changed to RunLoop `.common` mode for reliability
 
 ### Technical Details
-- Added `SnapshotSettings` class for auto-snapshot configuration management
+- Added `SnapshotSettings` class with `protectExistingSnapshot` and `minimumWindowCount`
 - Added `ManualSnapshotStorage` class for snapshot persistence using JSON encoding
 - Added `displayMemoryInterval` to `WindowTimingSettings` class
-- Implemented `initialSnapshotTimer` and `periodicSnapshotTimer` for auto-snapshot scheduling
-- Added `schedulePostDisplayConnectionSnapshot()` for post-display-reconnection snapshots
-- Added `restartDisplayMemoryTimer()` for real-time interval changes
-- Snapshot data structure: `[[String: [String: CGRect]]]` encoded as JSON in UserDefaults
+- Added `nudgePixels` to `HotKeySettings` class
+- Added `NudgeDirection` enum and `nudgeWindow()` method
+- Registered hotKeyRef5-8 for W/A/S/D keys
+- Settings UI uses `GroupBox` and `Picker` for tab navigation
+- Snapshot protection logic in `performAutoSnapshot()`
 
 ### Migration Notes
 - Existing users: No action required, snapshots from v1.2.3 were memory-only
-- New default behavior: Auto-snapshot 5 minutes after launch (can be disabled by setting interval)
+- New default behavior: Auto-snapshot 15 minutes after launch with data protection enabled
 
 ## [1.2.3] - 2025-11-26
 
