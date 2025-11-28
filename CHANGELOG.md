@@ -7,7 +7,63 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Planned (v1.3.0)
+## [1.2.6] - 2025-11-29
+
+### Added
+- **Privacy-aware Window Matching** (#14)
+  - App names and window titles are now hashed (SHA256) before storage
+  - Protects user privacy: stored data reveals no information about opened apps or content
+  - Fallback matching strategy: title hash → size match → app-only match
+  - Windows can now be restored after app restart (CGWindowID no longer required)
+- **Position Proximity Matching**
+  - When multiple windows have the same size, the window closest to the saved position is selected
+  - Prevents cross-display mismatches when restoring windows
+  - Distance (in pixels) shown in verbose logs for debugging
+- **Privacy Protection Mode**
+  - New setting: "Don't persist snapshots" option
+  - When enabled, all snapshot data is cleared on app quit
+  - Existing data is immediately cleared when enabling this option
+  - For users who want no data written to disk
+- **Verbose Logging Option**
+  - New setting: "Enable verbose logging" toggle
+  - When disabled (default), only essential logs are output
+  - When enabled, detailed matching info (targets, candidates, distances) is shown
+  - Useful for troubleshooting window restoration issues
+
+### Changed
+- **Snapshot data format upgraded to v2**
+  - New structure using `WindowMatchInfo` with hashed identifiers
+  - Old format data (v1.2.x) is automatically discarded on first launch
+  - Users need to save snapshots again after upgrading
+
+### Fixed
+- **Auto-restore respects manual snapshot placement**
+  - Windows saved to main display in manual snapshot are no longer moved to external display
+  - Prevents unintended window movement after sleep/wake when periodic snapshot differs from manual snapshot
+
+### Security
+- Position and size data remain in plaintext (required for restoration)
+- Threat model consideration: Accessing UserDefaults requires local file system access, 
+  at which point an attacker likely has more direct means of observation
+- This improvement reduces incidental data exposure in backups and sync scenarios
+
+### Technical Details
+- Added `WindowMatchInfo` struct with `appNameHash`, `titleHash`, `size`, and `frame` fields
+- Implemented SHA256 hashing using CryptoKit framework
+- Added `findMatchingWindow()` with priority-based fallback matching
+- Position proximity sorting for same-size window candidates
+- Storage key changed from `manualSnapshotData` to `manualSnapshotDataV2`
+- Added `disablePersistence` property to `SnapshotSettings`
+- Added `verboseLogging` property with `verbosePrint()` function
+- Added `applicationWillTerminate()` for cleanup on quit
+- `restoreWindowsIfNeeded()` now checks manual snapshot before moving windows to external display
+
+### Migration Notes
+- **Breaking change**: Saved snapshots from v1.2.x will be cleared
+- After upgrading, use ⌃⌥⌘↑ to save a new snapshot
+- Privacy protection mode is OFF by default (existing behavior preserved)
+
+### Planned (Future)
 - **Manual Window Snapshot & Restore**: Enhanced features
   - Visual notification feedback (screen flash, sound)
   - Multiple snapshot slots with UI selection
@@ -17,7 +73,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Japanese localization
   - Localized debug logs for international users
 
-### Future Considerations (Post v1.3.0)
+### Future Considerations (Post v1.2.6)
 - Per-app window restoration rules
 - Window size restoration (currently position only)
 - Support for more than 2 displays

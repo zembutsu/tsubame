@@ -46,7 +46,6 @@ A lightweight macOS menu bar app for effortless window management across multipl
   - Menu bar commands available
 - **Independent from Auto-Restore**: Works separately from display reconnection
 - **Current Limitations**:
-  - Restarted apps cannot be restored (window IDs change)
   - Fullscreen/minimized windows excluded
 
 ### Auto Snapshot & Persistence (v1.2.4+)
@@ -73,7 +72,20 @@ A lightweight macOS menu bar app for effortless window management across multipl
 
 > 💡 **Design Note**: This feature was inspired by "Tsubame" (燕/swallow) - the app's codename. The swift, agile movements of 燕返し (tsubame-gaeshi) suggested that window management should be equally nimble. Moving windows between screens is one thing, but fine-tuning their position should also be keyboard-driven. No more reaching for the trackpad just to nudge a window "a bit to the right." — *Zem, 2025-11-27*
 
-### Coming Soon (v1.3.0) 🚧
+### Privacy & Security (v1.2.6+)
+- **Privacy-aware Snapshot Storage**: Your data is protected
+  - App names and window titles are hashed (SHA256) before storage
+  - Stored data reveals nothing about which apps you use or what content you view
+  - Position and size data remain in plaintext (required for restoration)
+- **Window Matching After App Restart**: Fixed the CGWindowID limitation
+  - Windows can now be restored even after app restart
+  - Uses intelligent matching: title hash → size match → app-only match
+- **Privacy Protection Mode**: For maximum privacy
+  - Option to disable snapshot persistence entirely
+  - All data cleared on app quit
+  - Enable in Settings → Snapshot → "Don't persist snapshots"
+
+### Coming Soon 🚧
 
 ⚠️ **Note**: These features are under active development.
 
@@ -276,6 +288,12 @@ No sensitive information is logged or transmitted.
 
 ## Roadmap
 
+### Completed (v1.2.6)
+- [x] Privacy-aware window matching (SHA256 hashing for app names and titles)
+- [x] Window restoration after app restart (CGWindowID limitation fixed)
+- [x] Privacy protection mode (disable persistence option)
+- [x] Fallback matching strategy (title → size → app-only)
+
 ### Completed (v1.2.5)
 - [x] Fixed auto-snapshot false trigger after sleep/wake (#11)
 - [x] Display count protection for auto-snapshot
@@ -314,13 +332,13 @@ No sensitive information is logged or transmitted.
 - [x] Enhanced window position detection logic
 - [x] Debug log viewer with copy functionality
 
-### In Development (v1.3.0)
+### In Development (v1.4.0)
 - [ ] Enhanced snapshot features (multiple slots with UI selection)
 - [ ] Snapshot management interface (list, rename, delete)
 - [ ] Internationalization (English UI + Japanese localization)
 - [ ] Localized debug logs
 
-### Future Considerations (Post v1.3.0)
+### Future Considerations (Post v1.4.0)
 - [ ] Window size restoration (currently position only)
 - [ ] Support for more than 2 displays
 - [ ] Per-app window restoration rules
