@@ -782,10 +782,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         debugPrint("復元まで \(totalDelay)秒待機")
         
         let workItem = DispatchWorkItem { [weak self] in
-            self?.restoreWindowsIfNeeded()
+            let restoredCount = self?.restoreWindowsIfNeeded() ?? 0
             
-            // 外部ディスプレイ認識後のスナップショットをスケジュール
-            self?.schedulePostDisplayConnectionSnapshot()
+            // 復元成功かつ2画面以上の場合のみスナップショットを予約
+            if restoredCount > 0 && NSScreen.screens.count >= 2 {
+                self?.schedulePostDisplayConnectionSnapshot()
+            } else {
+                debugPrint("⏭️ スナップショット予約をスキップ（復元数: \(restoredCount), 画面数: \(NSScreen.screens.count)）")
+            }
+            
+            
         }
         
         restoreWorkItem = workItem
@@ -1052,14 +1058,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
     
-    /// 必要に応じてウィンドウを復元
-    private func restoreWindowsIfNeeded() {
+    /// ウィンドウを復元し、復元したウィンドウ数を返す
+    @discardableResult // 関数の戻り値がなくても警告を出さない
+    private func restoreWindowsIfNeeded() -> Int {
         debugPrint("🔄 ウィンドウ復元処理を開始...")
         
         let currentScreens = NSScreen.screens
         guard currentScreens.count >= 2 else {
             debugPrint("  画面が1つしかないため、復元をスキップします")
-            return
+            return 0
         }
         
         let currentScreenIDs = Set(currentScreens.map { getDisplayIdentifier(for: $0) })
@@ -1072,7 +1079,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         if externalScreenIDs.isEmpty {
             debugPrint("  復元対象の外部ディスプレイがありません")
-            return
+            return 0
         }
         
         debugPrint("  復元対象ディスプレイ: \(externalScreenIDs.joined(separator: ", "))")
@@ -1081,7 +1088,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let options = CGWindowListOption(arrayLiteral: .excludeDesktopElements, .optionOnScreenOnly)
         guard let windowList = CGWindowListCopyWindowInfo(options, kCGNullWindowID) as? [[String: Any]] else {
             debugPrint("  ❌ ウィンドウリストの取得に失敗")
-            return
+            return 0
         }
         
         // デバッグ: 現在のウィンドウリストを表示
@@ -1198,6 +1205,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
         
         debugPrint("✅ 合計 \(restoredCount)個のウィンドウを復元しました\n")
+        return restoredCount
     }
     
     // MARK: - 自動スナップショット機能
