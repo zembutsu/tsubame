@@ -1181,8 +1181,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                                 var currentPoint = CGPoint.zero
                                 if AXValueGetValue(currentPosValue as! AXValue, .cgPoint, &currentPoint) {
                                     // 現在の位置が現在のウィンドウ位置と一致するか確認
-                                    if abs(currentPoint.x - currentFrame.origin.x) < 10 &&
-                                       abs(currentPoint.y - currentFrame.origin.y) < 10 {
+                                    if abs(currentPoint.x - currentFrame.origin.x) < 50 &&
+                                       abs(currentPoint.y - currentFrame.origin.y) < 50 {
                                         // 保存された座標に移動
                                         var position = CGPoint(x: savedFrame.origin.x, y: savedFrame.origin.y)
                                         if let positionValue = AXValueCreate(.cgPoint, &position) {
