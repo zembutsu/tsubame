@@ -23,6 +23,36 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Support for more than 2 displays
 - Export/Import snapshots as JSON
 
+## [1.2.5] - 2025-11-28
+
+### Fixed
+- **Auto-snapshot false trigger after sleep/wake** (#11)
+  - Snapshot now only scheduled when restore count > 0 AND screen count >= 2
+  - Prevents overwriting 2-display layout with single-display state
+- **Display count protection for auto-snapshot**
+  - Skip auto-snapshot when only 1 display connected
+  - Protects saved layout during sleep/wake transitions
+- **Debug log accuracy for AXUIElement matching**
+  - Fixed false warning logs appearing after successful restore
+  - Added proper logging when position matching fails
+- **Improved AXUIElement position matching tolerance**
+  - Increased tolerance from 10px to 50px
+  - Absorbs coordinate system fluctuations during sleep/wake
+
+### Added
+- **Window restoration retry mechanism** (#13)
+  - Automatically retries restoration up to 2 times if initial attempt fails
+  - 3 second delay between retry attempts
+  - Addresses intermittent failures due to macOS coordinate system instability
+  - Retry counter resets on new display events
+
+### Technical Details
+- `restoreWindowsIfNeeded()` now returns restored window count
+- Added display count validation in `performAutoSnapshot()`
+- Added `matchFound` flag in AXUIElement position matching logic
+- Added `restoreRetryCount`, `maxRestoreRetries`, `restoreRetryDelay` properties
+- Modified `triggerRestoration()` to support retry with `isRetry` parameter
+
 ## [1.2.4] - 2025-11-27
 
 ### Added

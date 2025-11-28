@@ -276,6 +276,13 @@ No sensitive information is logged or transmitted.
 
 ## Roadmap
 
+### Completed (v1.2.5)
+- [x] Fixed auto-snapshot false trigger after sleep/wake (#11)
+- [x] Display count protection for auto-snapshot
+- [x] Window restoration retry mechanism (#13)
+- [x] Improved AXUIElement position matching tolerance (10px → 50px)
+- [x] Debug log improvements for restoration failures
+
 ### Completed (v1.2.4)
 - [x] Automatic snapshot (initial + periodic)
 - [x] Persistent snapshot storage (UserDefaults)
