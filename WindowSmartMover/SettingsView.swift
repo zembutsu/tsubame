@@ -2,6 +2,38 @@ import SwiftUI
 import Carbon
 import Combine
 import AppKit
+import CryptoKit
+
+// MARK: - Window Matching Data Structure
+
+/// ウィンドウ識別情報（プライバシー保護のためハッシュ化）
+struct WindowMatchInfo: Codable, Equatable {
+    let appNameHash: String      // SHA256(appName)
+    let titleHash: String?       // SHA256(title) - マッチング用
+    let size: CGSize             // フォールバックマッチング用
+    let frame: CGRect            // 復元位置
+    
+    /// SHA256ハッシュを生成
+    static func hash(_ input: String) -> String {
+        let data = Data(input.utf8)
+        let hash = SHA256.hash(data: data)
+        return hash.compactMap { String(format: "%02x", $0) }.joined()
+    }
+    
+    /// ウィンドウ情報から生成
+    init(appName: String, title: String?, size: CGSize, frame: CGRect) {
+        self.appNameHash = WindowMatchInfo.hash(appName)
+        self.titleHash = title.map { WindowMatchInfo.hash($0) }
+        self.size = size
+        self.frame = frame
+    }
+    
+    /// サイズが近似しているか（±20px許容）
+    func sizeMatches(_ otherSize: CGSize, tolerance: CGFloat = 20) -> Bool {
+        return abs(size.width - otherSize.width) <= tolerance &&
+               abs(size.height - otherSize.height) <= tolerance
+    }
+}
 
 class HotKeySettings: ObservableObject {
     static let shared = HotKeySettings()
@@ -258,6 +290,8 @@ class SnapshotSettings: ObservableObject {
     private let enableSoundKey = "snapshotEnableSound"
     private let enableNotificationKey = "snapshotEnableNotification"
     private let soundNameKey = "snapshotSoundName"
+    private let disablePersistenceKey = "snapshotDisablePersistence"
+    private let verboseLoggingKey = "snapshotVerboseLogging"
     
     /// 利用可能なシステムサウンド
     static let availableSounds = [
@@ -287,6 +321,24 @@ class SnapshotSettings: ObservableObject {
         }
     }
     
+    /// スナップショットを永続化しない（プライバシー保護モード）
+    @Published var disablePersistence: Bool {
+        didSet {
+            defaults.set(disablePersistence, forKey: disablePersistenceKey)
+            // 有効化時に既存データをクリア
+            if disablePersistence {
+                ManualSnapshotStorage.shared.clear()
+            }
+        }
+    }
+    
+    /// 詳細ログを出力（デバッグ用）
+    @Published var verboseLogging: Bool {
+        didSet {
+            defaults.set(verboseLogging, forKey: verboseLoggingKey)
+        }
+    }
+    
     private init() {
         self.initialSnapshotDelay = defaults.object(forKey: initialDelayKey) as? Double ?? 15.0
         self.enablePeriodicSnapshot = defaults.object(forKey: enablePeriodicKey) as? Bool ?? false
@@ -296,6 +348,8 @@ class SnapshotSettings: ObservableObject {
         self.enableSound = defaults.object(forKey: enableSoundKey) as? Bool ?? true
         self.soundName = defaults.object(forKey: soundNameKey) as? String ?? "Blow"
         self.enableNotification = defaults.object(forKey: enableNotificationKey) as? Bool ?? false
+        self.disablePersistence = defaults.object(forKey: disablePersistenceKey) as? Bool ?? false
+        self.verboseLogging = defaults.object(forKey: verboseLoggingKey) as? Bool ?? false
     }
     
     /// サウンドをプレビュー再生
@@ -314,73 +368,44 @@ class SnapshotSettings: ObservableObject {
     }
 }
 
-// ManualSnapshotStorage: スナップショットの永続化
+// ManualSnapshotStorage: スナップショットの永続化（プライバシー保護版）
 class ManualSnapshotStorage {
     static let shared = ManualSnapshotStorage()
     
     private let defaults = UserDefaults.standard
-    private let storageKey = "manualSnapshotData"
+    private let storageKey = "manualSnapshotDataV2"  // 新形式用のキー
     private let timestampKey = "manualSnapshotTimestamp"
+    private let legacyStorageKey = "manualSnapshotData"  // 旧形式のキー（マイグレーション用）
     
-    private init() {}
-    
-    /// スナップショットを保存
-    func save(_ snapshots: [[String: [String: CGRect]]]) {
-        // CGRectを辞書形式に変換してJSON化
-        var jsonCompatible: [[[String: [String: [String: CGFloat]]]]] = []
-        
-        for slot in snapshots {
-            var slotData: [[String: [String: [String: CGFloat]]]] = []
-            for (displayID, windows) in slot {
-                var windowsData: [String: [String: CGFloat]] = [:]
-                for (windowID, frame) in windows {
-                    windowsData[windowID] = [
-                        "x": frame.origin.x,
-                        "y": frame.origin.y,
-                        "width": frame.size.width,
-                        "height": frame.size.height
-                    ]
-                }
-                slotData.append([displayID: windowsData])
-            }
-            jsonCompatible.append(slotData)
-        }
-        
-        if let data = try? JSONEncoder().encode(jsonCompatible) {
-            defaults.set(data, forKey: storageKey)
-            defaults.set(Date().timeIntervalSince1970, forKey: timestampKey)
-            print("💾 スナップショットを永続化しました")
+    private init() {
+        // 旧形式データがあれば削除
+        if defaults.data(forKey: legacyStorageKey) != nil {
+            defaults.removeObject(forKey: legacyStorageKey)
+            print("🔄 旧形式のスナップショットデータを削除しました（v1.3.0移行）")
         }
     }
     
-    /// スナップショットを読み込み
-    func load() -> [[String: [String: CGRect]]]? {
-        guard let data = defaults.data(forKey: storageKey),
-              let jsonCompatible = try? JSONDecoder().decode([[[String: [String: [String: CGFloat]]]]].self, from: data) else {
-            return nil
+    /// スナップショットを保存（新形式: WindowMatchInfo）
+    func save(_ snapshots: [[String: [String: WindowMatchInfo]]]) {
+        // 永続化無効の場合はスキップ
+        if SnapshotSettings.shared.disablePersistence {
+            print("🔒 永続化無効モード: スナップショットは保存されません")
+            return
         }
         
-        // 辞書形式からCGRectに変換
-        var snapshots: [[String: [String: CGRect]]] = []
-        
-        for slotData in jsonCompatible {
-            var slot: [String: [String: CGRect]] = [:]
-            for displayDict in slotData {
-                for (displayID, windowsData) in displayDict {
-                    var windows: [String: CGRect] = [:]
-                    for (windowID, frameData) in windowsData {
-                        let frame = CGRect(
-                            x: frameData["x"] ?? 0,
-                            y: frameData["y"] ?? 0,
-                            width: frameData["width"] ?? 0,
-                            height: frameData["height"] ?? 0
-                        )
-                        windows[windowID] = frame
-                    }
-                    slot[displayID] = windows
-                }
-            }
-            snapshots.append(slot)
+        // WindowMatchInfoは直接Codable対応
+        if let data = try? JSONEncoder().encode(snapshots) {
+            defaults.set(data, forKey: storageKey)
+            defaults.set(Date().timeIntervalSince1970, forKey: timestampKey)
+            print("💾 スナップショットを永続化しました（プライバシー保護形式）")
+        }
+    }
+    
+    /// スナップショットを読み込み（新形式）
+    func load() -> [[String: [String: WindowMatchInfo]]]? {
+        guard let data = defaults.data(forKey: storageKey),
+              let snapshots = try? JSONDecoder().decode([[String: [String: WindowMatchInfo]]].self, from: data) else {
+            return nil
         }
         
         if let timestamp = defaults.object(forKey: timestampKey) as? Double {
@@ -618,6 +643,19 @@ struct SettingsView: View {
                     
                     Divider()
                     
+                    // プライバシー設定
+                    Text("プライバシー")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    
+                    Toggle("スナップショットを永続化しない", isOn: $snapshotSettings.disablePersistence)
+                    
+                    Text("有効にすると、アプリ終了時にすべてのデータが消去されます")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    
+                    Divider()
+                    
                     // 通知設定
                     Text("通知")
                         .font(.caption)
@@ -646,6 +684,19 @@ struct SettingsView: View {
                             .help("プレビュー再生")
                         }
                     }
+                    
+                    Divider()
+                    
+                    // デバッグ設定
+                    Text("デバッグ")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    
+                    Toggle("詳細ログを出力", isOn: $snapshotSettings.verboseLogging)
+                    
+                    Text("スナップショット保存・復元時の詳細情報をログに出力します")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
                     
                     Divider()
                     

@@ -140,7 +140,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private var snapshotTimer: Timer?
     
     // 手動スナップショット機能（5スロット、将来拡張用）
-    private var manualSnapshots: [[String: [String: CGRect]]] = Array(repeating: [:], count: 5)
+    // 新形式: WindowMatchInfo使用（プライバシー保護のためハッシュ化）
+    private var manualSnapshots: [[String: [String: WindowMatchInfo]]] = Array(repeating: [:], count: 5)
     private var currentSlotIndex: Int = 0  // v1.2.3では常に0
     
     // 自動スナップショット機能
@@ -915,7 +916,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
         
         let screens = NSScreen.screens
-        var snapshot: [String: [String: CGRect]] = [:]
+        var snapshot: [String: [String: WindowMatchInfo]] = [:]
         
         // 画面ごとに初期化
         for screen in screens {
@@ -941,15 +942,30 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 height: boundsDict["Height"] ?? 0
             )
             
-            let windowID = getWindowIdentifier(appName: ownerName, windowID: cgWindowID)
+            // ウィンドウタイトルを取得（存在しない場合はnil）
+            let windowTitle = window[kCGWindowName as String] as? String
+            
+            // WindowMatchInfoを生成（ハッシュ化）
+            let matchInfo = WindowMatchInfo(
+                appName: ownerName,
+                title: windowTitle,
+                size: frame.size,
+                frame: frame
+            )
+            
+            // ユニークキー（ハッシュベース）を生成
+            let windowKey = "\(matchInfo.appNameHash)_\(cgWindowID)"
             
             // このウィンドウがどの画面にあるか判定
             for screen in screens {
                 if screen.frame.intersects(frame) {
                     let displayID = getDisplayIdentifier(for: screen)
-                    snapshot[displayID]?[windowID] = frame
+                    snapshot[displayID]?[windowKey] = matchInfo
                     savedCount += 1
-                    debugPrint("  保存: \(ownerName) @ (\(Int(frame.origin.x)), \(Int(frame.origin.y)))")
+                    // タイトル情報を含めてログ出力（詳細モード）
+                    let titleInfo = windowTitle != nil ? "title:✓" : "title:✗"
+                    let sizeInfo = "\(Int(frame.width))x\(Int(frame.height))"
+                    verbosePrint("  保存: \(ownerName) @ (\(Int(frame.origin.x)), \(Int(frame.origin.y))) [\(sizeInfo)] [\(titleInfo)]")
                     break
                 }
             }
@@ -990,75 +1006,69 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
         
         var restoredCount = 0
+        var usedWindowIDs = Set<CGWindowID>()  // 既にマッチしたウィンドウを追跡
         
         // 各ディスプレイの保存データを処理
-        for (_, savedWindows) in snapshot {
-            for (savedWindowID, savedFrame) in savedWindows {
-                // windowIDからアプリ名とCGWindowIDを抽出
-                let components = savedWindowID.split(separator: "_")
-                guard components.count >= 2,
-                      let cgWindowID = UInt32(components[1]) else {
+        for (displayID, savedWindows) in snapshot {
+            verbosePrint("  📍 ディスプレイ \(displayID): \(savedWindows.count)個の保存情報")
+            for (windowKey, savedInfo) in savedWindows {
+                let targetPos = "(\(Int(savedInfo.frame.origin.x)), \(Int(savedInfo.frame.origin.y)))"
+                let targetSize = "\(Int(savedInfo.size.width))x\(Int(savedInfo.size.height))"
+                let hasTitle = savedInfo.titleHash != nil ? "title:✓" : "title:✗"
+                verbosePrint("    → 目標: \(targetPos) [\(targetSize)] [\(hasTitle)]")
+                
+                // マッチング: 優先順位順に試行
+                let matchedWindow = findMatchingWindow(
+                    for: savedInfo,
+                    in: windowList,
+                    excluding: usedWindowIDs
+                )
+                
+                guard let (matchedWindowInfo, ownerPID, ownerName, cgWindowID) = matchedWindow else {
+                    verbosePrint("      ⚠️ マッチするウィンドウなし")
                     continue
                 }
-                let appName = String(components[0])
                 
-                // 現在のウィンドウリストから該当するものを探す
-                for window in windowList {
-                    guard let ownerName = window[kCGWindowOwnerName as String] as? String,
-                          ownerName == appName,
-                          let currentCGWindowID = window[kCGWindowNumber as String] as? CGWindowID,
-                          currentCGWindowID == cgWindowID,
-                          let layer = window[kCGWindowLayer as String] as? Int,
-                          layer == 0,
-                          let boundsDict = window[kCGWindowBounds as String] as? [String: CGFloat],
-                          let ownerPID = window[kCGWindowOwnerPID as String] as? Int32 else {
-                        continue
-                    }
-                    
-                    let currentFrame = CGRect(
-                        x: boundsDict["X"] ?? 0,
-                        y: boundsDict["Y"] ?? 0,
-                        width: boundsDict["Width"] ?? 0,
-                        height: boundsDict["Height"] ?? 0
-                    )
-                    
-                    // 位置が変わっていない場合はスキップ
-                    if abs(currentFrame.origin.x - savedFrame.origin.x) < 5 &&
-                       abs(currentFrame.origin.y - savedFrame.origin.y) < 5 {
-                        continue
-                    }
-                    
-                    // Accessibility APIでウィンドウを移動
-                    let appRef = AXUIElementCreateApplication(ownerPID)
-                    var windowListRef: CFTypeRef?
-                    let result = AXUIElementCopyAttributeValue(appRef, kAXWindowsAttribute as CFString, &windowListRef)
-                    
-                    if result == .success, let windows = windowListRef as? [AXUIElement] {
-                        for axWindow in windows {
-                            var currentPosRef: CFTypeRef?
-                            if AXUIElementCopyAttributeValue(axWindow, kAXPositionAttribute as CFString, &currentPosRef) == .success,
-                               let currentPosValue = currentPosRef {
-                                var currentPoint = CGPoint.zero
-                                if AXValueGetValue(currentPosValue as! AXValue, .cgPoint, &currentPoint) {
-                                    // 現在の位置が現在のウィンドウ位置と一致するか確認
-                                    if abs(currentPoint.x - currentFrame.origin.x) < 10 &&
-                                       abs(currentPoint.y - currentFrame.origin.y) < 10 {
-                                        // 保存された座標に移動
-                                        var position = CGPoint(x: savedFrame.origin.x, y: savedFrame.origin.y)
-                                        if let positionValue = AXValueCreate(.cgPoint, &position) {
-                                            let setResult = AXUIElementSetAttributeValue(axWindow, kAXPositionAttribute as CFString, positionValue)
-                                            if setResult == .success {
-                                                restoredCount += 1
-                                                debugPrint("  ✅ \(appName) を (\(Int(savedFrame.origin.x)), \(Int(savedFrame.origin.y))) に復元")
-                                            }
+                usedWindowIDs.insert(cgWindowID)
+                
+                let currentFrame = matchedWindowInfo
+                let savedFrame = savedInfo.frame
+                
+                // 位置が変わっていない場合はスキップ
+                if abs(currentFrame.origin.x - savedFrame.origin.x) < 5 &&
+                   abs(currentFrame.origin.y - savedFrame.origin.y) < 5 {
+                    continue
+                }
+                
+                // Accessibility APIでウィンドウを移動
+                let appRef = AXUIElementCreateApplication(ownerPID)
+                var windowListRef: CFTypeRef?
+                let result = AXUIElementCopyAttributeValue(appRef, kAXWindowsAttribute as CFString, &windowListRef)
+                
+                if result == .success, let windows = windowListRef as? [AXUIElement] {
+                    for axWindow in windows {
+                        var currentPosRef: CFTypeRef?
+                        if AXUIElementCopyAttributeValue(axWindow, kAXPositionAttribute as CFString, &currentPosRef) == .success,
+                           let currentPosValue = currentPosRef {
+                            var currentPoint = CGPoint.zero
+                            if AXValueGetValue(currentPosValue as! AXValue, .cgPoint, &currentPoint) {
+                                // 現在の位置が現在のウィンドウ位置と一致するか確認
+                                if abs(currentPoint.x - currentFrame.origin.x) < 10 &&
+                                   abs(currentPoint.y - currentFrame.origin.y) < 10 {
+                                    // 保存された座標に移動
+                                    var position = CGPoint(x: savedFrame.origin.x, y: savedFrame.origin.y)
+                                    if let positionValue = AXValueCreate(.cgPoint, &position) {
+                                        let setResult = AXUIElementSetAttributeValue(axWindow, kAXPositionAttribute as CFString, positionValue)
+                                        if setResult == .success {
+                                            restoredCount += 1
+                                            debugPrint("  ✅ \(ownerName) を (\(Int(savedFrame.origin.x)), \(Int(savedFrame.origin.y))) に復元")
                                         }
-                                        break
                                     }
+                                    break
                                 }
                             }
                         }
                     }
-                    break
                 }
             }
         }
@@ -1077,6 +1087,111 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 body: "復元対象のウィンドウがありませんでした"
             )
         }
+    }
+    
+    /// フォールバックマッチングでウィンドウを探す
+    /// 優先順位: 1. appNameHash + titleHash  2. appNameHash + サイズ近似  3. appNameHash単体
+    private func findMatchingWindow(
+        for savedInfo: WindowMatchInfo,
+        in windowList: [[String: Any]],
+        excluding usedIDs: Set<CGWindowID>
+    ) -> (frame: CGRect, pid: Int32, appName: String, windowID: CGWindowID)? {
+        
+        var titleMatches: [(CGRect, Int32, String, CGWindowID, String)] = []  // 5番目はタイトル（デバッグ用）
+        var sizeMatches: [(CGRect, Int32, String, CGWindowID)] = []
+        var appOnlyMatches: [(CGRect, Int32, String, CGWindowID)] = []
+        
+        let savedHasTitle = savedInfo.titleHash != nil
+        
+        for window in windowList {
+            guard let layer = window[kCGWindowLayer as String] as? Int, layer == 0,
+                  let boundsDict = window[kCGWindowBounds as String] as? [String: CGFloat],
+                  let ownerName = window[kCGWindowOwnerName as String] as? String,
+                  let ownerPID = window[kCGWindowOwnerPID as String] as? Int32,
+                  let cgWindowID = window[kCGWindowNumber as String] as? CGWindowID else {
+                continue
+            }
+            
+            // 既に使用済みのウィンドウはスキップ
+            if usedIDs.contains(cgWindowID) {
+                continue
+            }
+            
+            let currentFrame = CGRect(
+                x: boundsDict["X"] ?? 0,
+                y: boundsDict["Y"] ?? 0,
+                width: boundsDict["Width"] ?? 0,
+                height: boundsDict["Height"] ?? 0
+            )
+            
+            // appNameHashをチェック
+            let currentAppNameHash = WindowMatchInfo.hash(ownerName)
+            guard currentAppNameHash == savedInfo.appNameHash else {
+                continue
+            }
+            
+            let matchData = (currentFrame, ownerPID, ownerName, cgWindowID)
+            let currentTitle = window[kCGWindowName as String] as? String
+            
+            // titleHashでマッチ
+            if let savedTitleHash = savedInfo.titleHash,
+               let title = currentTitle {
+                let currentTitleHash = WindowMatchInfo.hash(title)
+                if currentTitleHash == savedTitleHash {
+                    titleMatches.append((currentFrame, ownerPID, ownerName, cgWindowID, title))
+                    continue
+                }
+            }
+            
+            // サイズでマッチ
+            if savedInfo.sizeMatches(currentFrame.size) {
+                sizeMatches.append(matchData)
+                continue
+            }
+            
+            // appName単体マッチ（最後のフォールバック）
+            appOnlyMatches.append(matchData)
+        }
+        
+        // 位置近接でソート（保存時の位置に最も近いウィンドウを優先）
+        let savedOrigin = savedInfo.frame.origin
+        
+        func distanceToSaved(_ frame: CGRect) -> CGFloat {
+            let dx = frame.origin.x - savedOrigin.x
+            let dy = frame.origin.y - savedOrigin.y
+            return sqrt(dx * dx + dy * dy)
+        }
+        
+        // サイズマッチ候補を位置でソート
+        if sizeMatches.count > 1 {
+            sizeMatches.sort { distanceToSaved($0.0) < distanceToSaved($1.0) }
+        }
+        
+        // appOnlyマッチ候補も位置でソート
+        if appOnlyMatches.count > 1 {
+            appOnlyMatches.sort { distanceToSaved($0.0) < distanceToSaved($1.0) }
+        }
+        
+        // 優先順位順に返す（詳細ログ付き）
+        if let match = titleMatches.first {
+            let shortTitle = String(match.4.prefix(30))
+            verbosePrint("    🎯 タイトルマッチ: \"\(shortTitle)...\" (候補\(titleMatches.count)件)")
+            return (match.0, match.1, match.2, match.3)
+        }
+        if let match = sizeMatches.first {
+            let savedSize = "\(Int(savedInfo.size.width))x\(Int(savedInfo.size.height))"
+            let titleStatus = savedHasTitle ? "保存時title:✓" : "保存時title:✗"
+            let dist = Int(distanceToSaved(match.0))
+            verbosePrint("    📐 サイズマッチ: \(savedSize) (候補\(sizeMatches.count)件, 距離\(dist)px) [\(titleStatus)]")
+            return match
+        }
+        if let match = appOnlyMatches.first {
+            let dist = Int(distanceToSaved(match.0))
+            verbosePrint("    📱 アプリ名マッチ (候補\(appOnlyMatches.count)件, 距離\(dist)px)")
+            return match
+        }
+        
+        return nil
     }
     
     /// ウィンドウを復元し、復元したウィンドウ数を返す
@@ -1105,6 +1220,17 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         debugPrint("  復元対象ディスプレイ: \(externalScreenIDs.joined(separator: ", "))")
         
+        // 手動スナップショットでメイン画面に保存されているウィンドウの位置を取得
+        // これらは外部ディスプレイに移動しない
+        var mainScreenSavedPositions: [CGRect] = []
+        if currentSlotIndex < manualSnapshots.count {
+            let snapshot = manualSnapshots[currentSlotIndex]
+            if let mainScreenWindows = snapshot[mainScreenID] {
+                mainScreenSavedPositions = mainScreenWindows.values.map { $0.frame }
+                verbosePrint("  📌 手動スナップショットでメイン画面に\(mainScreenSavedPositions.count)個のウィンドウが保存されています")
+            }
+        }
+        
         // 現在の全ウィンドウを取得
         let options = CGWindowListOption(arrayLiteral: .excludeDesktopElements, .optionOnScreenOnly)
         guard let windowList = CGWindowListCopyWindowInfo(options, kCGNullWindowID) as? [[String: Any]] else {
@@ -1113,12 +1239,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
         
         // デバッグ: 現在のウィンドウリストを表示
-        debugPrint("  現在のウィンドウ:")
+        verbosePrint("  現在のウィンドウ:")
         for window in windowList {
             if let ownerName = window[kCGWindowOwnerName as String] as? String,
                let cgWindowID = window[kCGWindowNumber as String] as? CGWindowID,
                let layer = window[kCGWindowLayer as String] as? Int, layer == 0 {
-                debugPrint("    現在ID: \(ownerName)_\(cgWindowID)")
+                verbosePrint("    現在ID: \(ownerName)_\(cgWindowID)")
             }
         }
         
@@ -1130,22 +1256,22 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 continue
             }
             
-            debugPrint("  画面 \(externalScreenID) に \(savedWindows.count)個の保存情報")
+            verbosePrint("  画面 \(externalScreenID) に \(savedWindows.count)個の保存情報")
             
             // デバッグ: 保存されているウィンドウIDを表示
             for (savedWindowID, _) in savedWindows {
-                debugPrint("    保存ID: \(savedWindowID)")
+                verbosePrint("    保存ID: \(savedWindowID)")
             }
             
             // 保存されたウィンドウを復元
             for (savedWindowID, savedFrame) in savedWindows {
-                debugPrint("    復元試行: \(savedWindowID)")
+                verbosePrint("    復元試行: \(savedWindowID)")
                 
                 // windowIDからアプリ名とCGWindowIDを抽出
                 let components = savedWindowID.split(separator: "_")
                 guard components.count >= 2,
                       let cgWindowID = UInt32(components[1]) else {
-                    debugPrint("      ❌ ID解析失敗")
+                    verbosePrint("      ❌ ID解析失敗")
                     continue
                 }
                 let appName = String(components[0])
@@ -1163,7 +1289,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                         continue
                     }
                     
-                    debugPrint("      ✓ ウィンドウ発見: \(ownerName)")
+                    verbosePrint("      ✓ ウィンドウ発見: \(ownerName)")
                     
                     let currentFrame = CGRect(
                         x: boundsDict["X"] ?? 0,
@@ -1172,8 +1298,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                         height: boundsDict["Height"] ?? 0
                     )
                     
-                    debugPrint("      現在位置: \(currentFrame)")
-                    debugPrint("      メイン画面: \(mainScreen.frame)")
+                    verbosePrint("      現在位置: \(currentFrame)")
+                    verbosePrint("      メイン画面: \(mainScreen.frame)")
                     
                     // メイン画面にあるウィンドウのみを復元対象とする
                     // より確実な判定: ウィンドウのX座標がメイン画面の範囲内にあるか
@@ -1181,11 +1307,26 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                                         currentFrame.origin.x < (mainScreen.frame.origin.x + mainScreen.frame.width)
                     
                     if !isOnMainScreen {
-                        debugPrint("      ❌ メイン画面にない(スキップ) - X座標: \(currentFrame.origin.x)")
+                        verbosePrint("      ❌ メイン画面にない(スキップ) - X座標: \(currentFrame.origin.x)")
                         continue
                     }
                     
-                    debugPrint("      ✓ メイン画面にある - X座標: \(currentFrame.origin.x)")
+                    verbosePrint("      ✓ メイン画面にある - X座標: \(currentFrame.origin.x)")
+                    
+                    // 手動スナップショットでメイン画面に保存されている位置の近くにあるかチェック
+                    // 近くにある場合は、ユーザーが意図的にメイン画面に配置したウィンドウなのでスキップ
+                    let isNearManualSavedPosition = mainScreenSavedPositions.contains { savedPos in
+                        let dx = abs(currentFrame.origin.x - savedPos.origin.x)
+                        let dy = abs(currentFrame.origin.y - savedPos.origin.y)
+                        let sameSize = abs(currentFrame.width - savedPos.width) < 20 &&
+                                      abs(currentFrame.height - savedPos.height) < 20
+                        return dx < 100 && dy < 100 && sameSize
+                    }
+                    
+                    if isNearManualSavedPosition {
+                        verbosePrint("      🛡️ 手動スナップショットでメイン画面に保存済み - 外部移動をスキップ")
+                        continue
+                    }
                     
                     // Accessibility APIでウィンドウを移動
                     let appRef = AXUIElementCreateApplication(ownerPID)
@@ -1222,7 +1363,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                             }
                         }
                         if !matchFound {
-                            debugPrint("      ⚠️ AXUIElement位置マッチング失敗 - CGWindow位置: (\(Int(currentFrame.origin.x)), \(Int(currentFrame.origin.y)))")
+                            verbosePrint("      ⚠️ AXUIElement位置マッチング失敗 - CGWindow位置: (\(Int(currentFrame.origin.x)), \(Int(currentFrame.origin.y)))")
                         }
                     }
                     break
@@ -1393,7 +1534,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
         
         let screens = NSScreen.screens
-        var snapshot: [String: [String: CGRect]] = [:]
+        var snapshot: [String: [String: WindowMatchInfo]] = [:]
         
         // 画面ごとに初期化
         for screen in screens {
@@ -1419,13 +1560,25 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 height: boundsDict["Height"] ?? 0
             )
             
-            let windowID = getWindowIdentifier(appName: ownerName, windowID: cgWindowID)
+            // ウィンドウタイトルを取得（存在しない場合はnil）
+            let windowTitle = window[kCGWindowName as String] as? String
+            
+            // WindowMatchInfoを生成（ハッシュ化）
+            let matchInfo = WindowMatchInfo(
+                appName: ownerName,
+                title: windowTitle,
+                size: frame.size,
+                frame: frame
+            )
+            
+            // ユニークキー（ハッシュベース）を生成
+            let windowKey = "\(matchInfo.appNameHash)_\(cgWindowID)"
             
             // このウィンドウがどの画面にあるか判定
             for screen in screens {
                 if screen.frame.intersects(frame) {
                     let displayID = getDisplayIdentifier(for: screen)
-                    snapshot[displayID]?[windowID] = frame
+                    snapshot[displayID]?[windowKey] = matchInfo
                     savedCount += 1
                     break
                 }
@@ -1487,6 +1640,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
     
     
+    
+    func applicationWillTerminate(_ notification: Notification) {
+        // プライバシー保護モードの場合、終了時にスナップショットをクリア
+        if SnapshotSettings.shared.disablePersistence {
+            ManualSnapshotStorage.shared.clear()
+            debugPrint("🔒 アプリ終了時: プライバシー保護モードによりスナップショットを消去")
+        }
+    }
+    
     deinit {
         // ホットキーの登録解除
         if let hotKey = hotKeyRef {
@@ -1525,6 +1687,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
 // debugPrint関数の実装
 func debugPrint(_ message: String) {
+    print(message)
+    DebugLogger.shared.addLog(message)
+}
+
+// 詳細ログ用（設定で有効時のみ出力）
+func verbosePrint(_ message: String) {
+    guard SnapshotSettings.shared.verboseLogging else { return }
     print(message)
     DebugLogger.shared.addLog(message)
 }
