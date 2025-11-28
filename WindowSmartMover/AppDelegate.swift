@@ -1173,6 +1173,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                     
                     if result == .success, let windows = windowListRef as? [AXUIElement] {
                         // 全ウィンドウから該当するものを探す
+                        var matchFound = false
                         for axWindow in windows {
                             var currentPosRef: CFTypeRef?
                             if AXUIElementCopyAttributeValue(axWindow, kAXPositionAttribute as CFString, &currentPosRef) == .success,
@@ -1197,6 +1198,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                                     }
                                 }
                             }
+                        }
+                        if !matchFound {
+                            debugPrint("      ⚠️ AXUIElement位置マッチング失敗 - CGWindow位置: (\(Int(currentFrame.origin.x)), \(Int(currentFrame.origin.y)))")
                         }
                     }
                     break
@@ -1352,6 +1356,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     /// 自動スナップショットを実行
     private func performAutoSnapshot(reason: String) {
         debugPrint("📸 \(reason)スナップショットを取得中...")
+        
+        // ディスプレイ数の確認
+        let screenCount = NSScreen.screens.count
+        if screenCount < 2 {
+            debugPrint("🛡️ ディスプレイ保護: 画面数が\(screenCount)のため自動スナップショットをスキップ")
+            return
+        }
         
         let options = CGWindowListOption(arrayLiteral: .excludeDesktopElements, .optionOnScreenOnly)
         guard let windowList = CGWindowListCopyWindowInfo(options, kCGNullWindowID) as? [[String: Any]] else {
