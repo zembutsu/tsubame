@@ -782,10 +782,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         debugPrint("復元まで \(totalDelay)秒待機")
         
         let workItem = DispatchWorkItem { [weak self] in
-            self?.restoreWindowsIfNeeded()
+            let restoredCount = self?.restoreWindowsIfNeeded() ?? 0
             
-            // 外部ディスプレイ認識後のスナップショットをスケジュール
-            self?.schedulePostDisplayConnectionSnapshot()
+            // 復元成功かつ2画面以上の場合のみスナップショットを予約
+            if restoredCount > 0 && NSScreen.screens.count >= 2 {
+                self?.schedulePostDisplayConnectionSnapshot()
+            } else {
+                debugPrint("⏭️ スナップショット予約をスキップ（復元数: \(restoredCount), 画面数: \(NSScreen.screens.count)）")
+            }
+            
+            
         }
         
         restoreWorkItem = workItem
@@ -1052,14 +1058,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
     
-    /// 必要に応じてウィンドウを復元
-    private func restoreWindowsIfNeeded() {
+    /// ウィンドウを復元し、復元したウィンドウ数を返す
+    @discardableResult // 関数の戻り値がなくても警告を出さない
+    private func restoreWindowsIfNeeded() -> Int {
         debugPrint("🔄 ウィンドウ復元処理を開始...")
         
         let currentScreens = NSScreen.screens
         guard currentScreens.count >= 2 else {
             debugPrint("  画面が1つしかないため、復元をスキップします")
-            return
+            return 0
         }
         
         let currentScreenIDs = Set(currentScreens.map { getDisplayIdentifier(for: $0) })
@@ -1072,7 +1079,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         if externalScreenIDs.isEmpty {
             debugPrint("  復元対象の外部ディスプレイがありません")
-            return
+            return 0
         }
         
         debugPrint("  復元対象ディスプレイ: \(externalScreenIDs.joined(separator: ", "))")
@@ -1081,7 +1088,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let options = CGWindowListOption(arrayLiteral: .excludeDesktopElements, .optionOnScreenOnly)
         guard let windowList = CGWindowListCopyWindowInfo(options, kCGNullWindowID) as? [[String: Any]] else {
             debugPrint("  ❌ ウィンドウリストの取得に失敗")
-            return
+            return 0
         }
         
         // デバッグ: 現在のウィンドウリストを表示
@@ -1166,6 +1173,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                     
                     if result == .success, let windows = windowListRef as? [AXUIElement] {
                         // 全ウィンドウから該当するものを探す
+                        var matchFound = false
                         for axWindow in windows {
                             var currentPosRef: CFTypeRef?
                             if AXUIElementCopyAttributeValue(axWindow, kAXPositionAttribute as CFString, &currentPosRef) == .success,
@@ -1173,8 +1181,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                                 var currentPoint = CGPoint.zero
                                 if AXValueGetValue(currentPosValue as! AXValue, .cgPoint, &currentPoint) {
                                     // 現在の位置が現在のウィンドウ位置と一致するか確認
-                                    if abs(currentPoint.x - currentFrame.origin.x) < 10 &&
-                                       abs(currentPoint.y - currentFrame.origin.y) < 10 {
+                                    if abs(currentPoint.x - currentFrame.origin.x) < 50 &&
+                                       abs(currentPoint.y - currentFrame.origin.y) < 50 {
                                         // 保存された座標に移動
                                         var position = CGPoint(x: savedFrame.origin.x, y: savedFrame.origin.y)
                                         if let positionValue = AXValueCreate(.cgPoint, &position) {
@@ -1186,10 +1194,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                                                 debugPrint("    ❌ \(appName) の移動失敗: \(setResult.rawValue)")
                                             }
                                         }
+                                        matchFound = true
                                         break
                                     }
                                 }
                             }
+                        }
+                        if !matchFound {
+                            debugPrint("      ⚠️ AXUIElement位置マッチング失敗 - CGWindow位置: (\(Int(currentFrame.origin.x)), \(Int(currentFrame.origin.y)))")
                         }
                     }
                     break
@@ -1198,6 +1210,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
         
         debugPrint("✅ 合計 \(restoredCount)個のウィンドウを復元しました\n")
+        return restoredCount
     }
     
     // MARK: - 自動スナップショット機能
@@ -1344,6 +1357,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     /// 自動スナップショットを実行
     private func performAutoSnapshot(reason: String) {
         debugPrint("📸 \(reason)スナップショットを取得中...")
+        
+        // ディスプレイ数の確認
+        let screenCount = NSScreen.screens.count
+        if screenCount < 2 {
+            debugPrint("🛡️ ディスプレイ保護: 画面数が\(screenCount)のため自動スナップショットをスキップ")
+            return
+        }
         
         let options = CGWindowListOption(arrayLiteral: .excludeDesktopElements, .optionOnScreenOnly)
         guard let windowList = CGWindowListCopyWindowInfo(options, kCGNullWindowID) as? [[String: Any]] else {
