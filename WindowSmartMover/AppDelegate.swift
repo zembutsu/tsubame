@@ -169,6 +169,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     // フォールバックタイマー
     private var fallbackTimer: DispatchWorkItem?
     
+    // 復元リトライ機能
+    private var restoreRetryCount: Int = 0
+    private let maxRestoreRetries: Int = 2
+    private let restoreRetryDelay: TimeInterval = 3.0
+    
     func applicationDidFinishLaunching(_ notification: Notification) {
         // グローバル参照を設定
         globalAppDelegate = self
@@ -772,9 +777,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
     
     /// 復元処理をトリガー
-    private func triggerRestoration() {
+    private func triggerRestoration(isRetry: Bool = false) {
         // 既存のタイマーをキャンセル
         restoreWorkItem?.cancel()
+        
+        // 新しいリストアシーケンスの開始時はリトライカウンターをリセット
+        if !isRetry {
+            restoreRetryCount = 0
+        }
         
         let settings = WindowTimingSettings.shared
         let totalDelay = settings.windowRestoreDelay
@@ -782,16 +792,27 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         debugPrint("復元まで \(totalDelay)秒待機")
         
         let workItem = DispatchWorkItem { [weak self] in
-            let restoredCount = self?.restoreWindowsIfNeeded() ?? 0
+            guard let self = self else { return }
             
-            // 復元成功かつ2画面以上の場合のみスナップショットを予約
+            let restoredCount = self.restoreWindowsIfNeeded()
+            
+            // 復元成功かつ2画面以上の場合
             if restoredCount > 0 && NSScreen.screens.count >= 2 {
-                self?.schedulePostDisplayConnectionSnapshot()
+                self.restoreRetryCount = 0
+                self.schedulePostDisplayConnectionSnapshot()
+            } else if NSScreen.screens.count >= 2 && self.restoreRetryCount < self.maxRestoreRetries {
+                // 復元失敗でリトライ可能な場合
+                self.restoreRetryCount += 1
+                debugPrint("🔄 復元リトライ予約（\(self.restoreRetryCount)/\(self.maxRestoreRetries)）: \(self.restoreRetryDelay)秒後")
+                
+                // リトライをスケジュール
+                DispatchQueue.main.asyncAfter(deadline: .now() + self.restoreRetryDelay) { [weak self] in
+                    self?.triggerRestoration(isRetry: true)
+                }
             } else {
+                self.restoreRetryCount = 0
                 debugPrint("⏭️ スナップショット予約をスキップ（復元数: \(restoredCount), 画面数: \(NSScreen.screens.count)）")
             }
-            
-            
         }
         
         restoreWorkItem = workItem
