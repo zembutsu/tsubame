@@ -1,6 +1,5 @@
 name: Test
 
-# いつ実行するか
 on:
   push:
     branches: [ main, master ]
@@ -13,18 +12,18 @@ jobs:
     runs-on: macos-latest
 
     steps:
-      # 1. コードをチェックアウト
       - name: Checkout
         uses: actions/checkout@v4
 
-      # 2. Xcodeのバージョンを確認（デバッグ用）
       - name: Show Xcode version
         run: xcodebuild -version
 
-      # 3. テストを実行
       - name: Run tests
         run: |
           xcodebuild test \
             -project WindowSmartMover.xcodeproj \
             -scheme WindowSmartMover \
-            -destination 'platform=macOS'
+            -destination 'platform=macOS' \
+            CODE_SIGN_IDENTITY="-" \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGNING_ALLOWED=NO
