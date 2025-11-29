@@ -80,6 +80,9 @@ A lightweight macOS menu bar app for effortless window management across multipl
 - **Window Matching After App Restart**: Fixed the CGWindowID limitation
   - Windows can now be restored even after app restart
   - Uses intelligent matching: title hash → size match → app-only match
+- **CGWindowID Priority Matching**: Reliable same-session restoration
+  - Same-size windows are correctly identified using CGWindowID within session
+  - No more window mix-ups when you have multiple windows of the same app
 - **Privacy Protection Mode**: For maximum privacy
   - Option to disable snapshot persistence entirely
   - All data cleared on app quit

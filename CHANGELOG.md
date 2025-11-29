@@ -7,6 +7,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Future Tasks
+- Format floating-point delay display (e.g., `3.0000000000000004` → `3.0`)
+
 ## [1.2.6] - 2025-11-29
 
 ### Added
@@ -35,11 +38,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - New structure using `WindowMatchInfo` with hashed identifiers
   - Old format data (v1.2.x) is automatically discarded on first launch
   - Users need to save snapshots again after upgrading
+- **Unified window matching for auto-restore** (#17)
+  - Display reconnection restore now uses `WindowMatchInfo` format (same as manual snapshots)
+  - Shares `findMatchingWindow()` logic between manual and auto restore
+  - Position proximity matching now applies to auto-restore as well
+- **CGWindowID priority matching** (#17)
+  - Within the same session, CGWindowID is used for exact window identification
+  - Prevents window mix-ups when multiple windows have the same size
+  - Falls back to title/size/app matching after app restart
 
 ### Fixed
-- **Auto-restore respects manual snapshot placement**
-  - Windows saved to main display in manual snapshot are no longer moved to external display
-  - Prevents unintended window movement after sleep/wake when periodic snapshot differs from manual snapshot
+- **Stale window position data in auto-snapshot** (#17)
+  - `takeWindowSnapshot()` now clears old data before rebuilding
+  - Prevents phantom entries when windows move between displays
+  - Only updates when 2+ displays connected (preserves data during disconnection)
+  - Backs up and restores external display data if timing causes empty snapshot
+- **CGWindowID matching now verifies app name** (#17)
+  - Added appNameHash check to prevent theoretical cross-app mismatches
+- **Improved duplicate match prevention** (#17)
+  - CGWindowID-matched windows are marked as used even if already on external display
+  - Prevents same window from matching multiple saved entries
+- **Clearer log messages for external display windows** (#17)
+  - "Already on external display" vs "Not on main screen (skip)" distinction
 
 ### Security
 - Position and size data remain in plaintext (required for restoration)
@@ -56,7 +76,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added `disablePersistence` property to `SnapshotSettings`
 - Added `verboseLogging` property with `verbosePrint()` function
 - Added `applicationWillTerminate()` for cleanup on quit
-- `restoreWindowsIfNeeded()` now checks manual snapshot before moving windows to external display
+- `windowPositions` type changed to `[String: [String: WindowMatchInfo]]`
+- `takeWindowSnapshot()` includes external display backup mechanism
+- `findMatchingWindow()` accepts `preferredCGWindowID` parameter for exact matching
 
 ### Migration Notes
 - **Breaking change**: Saved snapshots from v1.2.x will be cleared
