@@ -7,6 +7,24 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Planned: v1.3.0 (Stable Release)
+- Internationalization (i18n) - English default + Japanese localization
+- App Store release preparation
+- Binary distribution via GitHub Releases
+
+## [1.2.8] - WIP
+
+### Added
+- **Startup Information in Debug Log** (#21)
+  - Display app version and build number on launch
+  - Show current settings summary (hotkey, timing, options)
+  - Helps users share configuration when reporting issues
+- **App Name Masking for Privacy** (#21)
+  - New setting: "Mask app names" in Settings → Debug (default: ON)
+  - Replaces app names with generic identifiers (App1, App2, etc.)
+  - Maintains consistency within session (same app = same identifier)
+  - Users can safely share logs in GitHub issues without exposing app usage
+
 ### Changed
 - **Repository renamed** (#10)
   - GitHub repository: `WindowSmartMover` → `tsubame`
@@ -14,8 +32,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Old URLs automatically redirect to new location
   - Bundle Identifier unchanged (user settings preserved)
 
-### Future Tasks
-- Internationalization (i18n) - English default + Japanese localization
+### Technical Details
+- Added `maskAppNamesInLog` property to `SnapshotSettings`
+- Added `maskAppName()` and `clearAppNameMapping()` to `DebugLogger`
+- Applied masking to all log outputs containing app names
 
 ## [1.2.7] - 2025-11-29
 
