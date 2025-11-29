@@ -6,21 +6,21 @@ import CryptoKit
 
 // MARK: - Window Matching Data Structure
 
-/// ウィンドウ識別情報（プライバシー保護のためハッシュ化）
+/// Window identification info (hashed for privacy protection)
 struct WindowMatchInfo: Codable, Equatable {
     let appNameHash: String      // SHA256(appName)
-    let titleHash: String?       // SHA256(title) - マッチング用
-    let size: CGSize             // フォールバックマッチング用
-    let frame: CGRect            // 復元位置
+    let titleHash: String?       // SHA256(title) - for matching
+    let size: CGSize             // for fallback matching
+    let frame: CGRect            // restore position
     
-    /// SHA256ハッシュを生成
+    /// Generate SHA256 hash
     static func hash(_ input: String) -> String {
         let data = Data(input.utf8)
         let hash = SHA256.hash(data: data)
         return hash.compactMap { String(format: "%02x", $0) }.joined()
     }
     
-    /// ウィンドウ情報から生成
+    /// Create from window info
     init(appName: String, title: String?, size: CGSize, frame: CGRect) {
         self.appNameHash = WindowMatchInfo.hash(appName)
         self.titleHash = title.map { WindowMatchInfo.hash($0) }
@@ -28,7 +28,7 @@ struct WindowMatchInfo: Codable, Equatable {
         self.frame = frame
     }
     
-    /// サイズが近似しているか（±20px許容）
+    /// Check if size is approximately equal (±20px tolerance)
     func sizeMatches(_ otherSize: CGSize, tolerance: CGFloat = 20) -> Bool {
         return abs(size.width - otherSize.width) <= tolerance &&
                abs(size.height - otherSize.height) <= tolerance
@@ -51,18 +51,18 @@ class HotKeySettings: ObservableObject {
         didSet { UserDefaults.standard.set(useCommand, forKey: "useCommand") }
     }
     
-    /// ウィンドウ微調整のピクセル数（10-500、デフォルト100）
+    /// Window nudge pixels (10-500, default 100)
     @Published var nudgePixels: Int {
         didSet { UserDefaults.standard.set(nudgePixels, forKey: "nudgePixels") }
     }
     
     private init() {
-        // デフォルト値: Ctrl + Command
+        // Default: Option + Command
         self.useControl = UserDefaults.standard.object(forKey: "useControl") as? Bool ?? false
         self.useOption = UserDefaults.standard.object(forKey: "useOption") as? Bool ?? true
         self.useShift = UserDefaults.standard.object(forKey: "useShift") as? Bool ?? false
         self.useCommand = UserDefaults.standard.object(forKey: "useCommand") as? Bool ?? true
-        // デフォルト値: 100ピクセル
+        // Default: 100 pixels
         self.nudgePixels = UserDefaults.standard.object(forKey: "nudgePixels") as? Int ?? 100
     }
     
@@ -85,7 +85,7 @@ class HotKeySettings: ObservableObject {
     }
 }
 
-// WindowTimingSettings: ウィンドウ読み込みタイミング設定
+// WindowTimingSettings: Window loading timing settings
 class WindowTimingSettings: ObservableObject {
     static let shared = WindowTimingSettings()
     
@@ -113,11 +113,11 @@ class WindowTimingSettings: ObservableObject {
         }
     }
     
-    /// ディスプレイ記憶用の監視間隔（秒）: 1-30秒、デフォルト5秒
+    /// Display memory monitoring interval (seconds): 1-30s, default 5s
     @Published var displayMemoryInterval: Double {
         didSet {
             defaults.set(displayMemoryInterval, forKey: displayMemoryIntervalKey)
-            // 設定変更を通知
+            // Notify settings change
             NotificationCenter.default.post(
                 name: Notification.Name("DisplayMemoryIntervalChanged"),
                 object: nil
@@ -125,7 +125,7 @@ class WindowTimingSettings: ObservableObject {
         }
     }
     
-    // スリープ監視関連
+    // Sleep monitoring related
     @Published var lastSleepTime: Date?
     @Published var lastWakeTime: Date?
     @Published var sleepDurationHours: Double = 0
@@ -135,20 +135,20 @@ class WindowTimingSettings: ObservableObject {
     private var wakeObserver: NSObjectProtocol?
     
     private init() {
-        // デフォルト値: ディスプレイ接続後の待機時間は6.0秒
+        // Default: Post-display-connection wait time is 6.0s
         self.windowRestoreDelay = defaults.object(forKey: windowDelayKey) as? Double ?? 6.0
-        // デフォルト値: ディスプレイ変更の落ち着き待ち時間は6.0秒
+        // Default: Display change stabilization wait time is 6.0s
         self.displayStabilizationDelay = defaults.object(forKey: displayStabilizationKey) as? Double ?? 6.0
-        // デフォルト値: スリープ中の監視停止を有効化
+        // Default: Enable monitoring pause during sleep
         self.disableMonitoringDuringSleep = defaults.object(forKey: disableMonitoringKey) as? Bool ?? true
-        // デフォルト値: ディスプレイ記憶用監視間隔は5.0秒
+        // Default: Display memory monitoring interval is 5.0s
         self.displayMemoryInterval = defaults.object(forKey: displayMemoryIntervalKey) as? Double ?? 5.0
         
-        // スリープ監視を開始
+        // Start sleep monitoring
         startSleepMonitoring()
     }
     
-    // スリープ監視開始
+    // Start sleep monitoring
     private func startSleepMonitoring() {
         sleepObserver = NSWorkspace.shared.notificationCenter.addObserver(
             forName: NSWorkspace.willSleepNotification,
@@ -159,7 +159,7 @@ class WindowTimingSettings: ObservableObject {
             self.lastSleepTime = Date()
             print("💤 System going to sleep at \(Date())")
             
-            // スリープ時にディスプレイ監視を一時停止
+            // Pause display monitoring during sleep
             if self.disableMonitoringDuringSleep {
                 self.isMonitoringEnabled = false
                 print("⏸️ Display monitoring disabled during sleep")
@@ -179,7 +179,7 @@ class WindowTimingSettings: ObservableObject {
         }
     }
     
-    // ウェイク時の処理
+    // Wake handling
     private func handleWake() {
         lastWakeTime = Date()
         if let sleepTime = lastSleepTime {
@@ -188,35 +188,35 @@ class WindowTimingSettings: ObservableObject {
             print("☀️ System woke from sleep after \(String(format: "%.2f", sleepDurationHours)) hours")
         }
         
-        // 監視一時停止機能が有効な場合
+        // If monitoring pause feature is enabled
         if disableMonitoringDuringSleep {
             print("⏱️ Waiting for display stabilization...")
             print("   Monitoring will resume automatically after stabilization")
-            // 注: 監視再開は安定化ロジック（AppDelegate）が自動的に行う
-            // ここでは何もしない = ディスプレイ変更イベントの安定化に任せる
+            // Note: Monitoring resume is handled automatically by stabilization logic (AppDelegate)
+            // Do nothing here = leave it to display change event stabilization
         }
     }
     
-    // 動的調整された待機時間を取得
+    // Get dynamically adjusted wait time
     func getAdjustedDisplayDelay() -> Double {
         let baseDelay = displayStabilizationDelay
         
-        // スリープ時間に応じて追加の待機時間を決定
+        // Determine additional wait time based on sleep duration
         switch sleepDurationHours {
         case 0..<0.5:
-            // 30分未満: 変更なし
+            // Less than 30 min: no change
             return baseDelay
         case 0.5..<1.0:
-            // 30分〜1時間: +2秒
+            // 30 min - 1 hour: +2s
             return baseDelay + 2.0
         case 1.0..<2.0:
-            // 1〜2時間: +5秒
+            // 1-2 hours: +5s
             return baseDelay + 5.0
         case 2.0..<4.0:
-            // 2〜4時間: +10秒
+            // 2-4 hours: +10s
             return baseDelay + 10.0
         default:
-            // 4時間以上: +15秒
+            // 4+ hours: +15s
             return baseDelay + 15.0
         }
     }
@@ -231,7 +231,7 @@ class WindowTimingSettings: ObservableObject {
     }
 }
 
-// SnapshotSettings: 自動スナップショット設定
+// SnapshotSettings: Auto snapshot settings
 class SnapshotSettings: ObservableObject {
     static let shared = SnapshotSettings()
     
@@ -240,18 +240,18 @@ class SnapshotSettings: ObservableObject {
     private let enablePeriodicKey = "snapshotEnablePeriodic"
     private let periodicIntervalKey = "snapshotPeriodicInterval"
     
-    /// 初回スナップショット遅延（分）: 0.5-60分、デフォルト5分
+    /// Initial snapshot delay (minutes): 0.5-60min, default 5min
     @Published var initialSnapshotDelay: Double {
         didSet {
             defaults.set(initialSnapshotDelay, forKey: initialDelayKey)
         }
     }
     
-    /// 定期スナップショット有効化
+    /// Enable periodic snapshot
     @Published var enablePeriodicSnapshot: Bool {
         didSet {
             defaults.set(enablePeriodicSnapshot, forKey: enablePeriodicKey)
-            // 設定変更を通知
+            // Notify settings change
             NotificationCenter.default.post(
                 name: Notification.Name("SnapshotSettingsChanged"),
                 object: nil
@@ -259,11 +259,11 @@ class SnapshotSettings: ObservableObject {
         }
     }
     
-    /// 定期スナップショット間隔（分）: 5-360分、デフォルト30分
+    /// Periodic snapshot interval (minutes): 5-360min, default 30min
     @Published var periodicSnapshotInterval: Double {
         didSet {
             defaults.set(periodicSnapshotInterval, forKey: periodicIntervalKey)
-            // 設定変更を通知
+            // Notify settings change
             NotificationCenter.default.post(
                 name: Notification.Name("SnapshotSettingsChanged"),
                 object: nil
@@ -271,14 +271,14 @@ class SnapshotSettings: ObservableObject {
         }
     }
     
-    /// 既存スナップショット保護（ウィンドウ数が少ない場合は上書きしない）
+    /// Protect existing snapshot (don't overwrite if window count is low)
     @Published var protectExistingSnapshot: Bool {
         didSet {
             defaults.set(protectExistingSnapshot, forKey: protectExistingKey)
         }
     }
     
-    /// 保護時の最小ウィンドウ数
+    /// Minimum window count for protection
     @Published var minimumWindowCount: Int {
         didSet {
             defaults.set(minimumWindowCount, forKey: minimumWindowCountKey)
@@ -296,71 +296,71 @@ class SnapshotSettings: ObservableObject {
     private let showMillisecondsKey = "debugShowMilliseconds"
     private let maskAppNamesKey = "debugMaskAppNames"
     
-    /// 利用可能なシステムサウンド
+    /// Available system sounds
     static let availableSounds = [
         "Blow", "Bottle", "Frog", "Funk", "Glass",
         "Hero", "Morse", "Ping", "Pop", "Purr",
         "Sosumi", "Submarine", "Tink"
     ]
     
-    /// サウンド通知有効化
+    /// Enable sound notification
     @Published var enableSound: Bool {
         didSet {
             defaults.set(enableSound, forKey: enableSoundKey)
         }
     }
     
-    /// 通知サウンド名
+    /// Notification sound name
     @Published var soundName: String {
         didSet {
             defaults.set(soundName, forKey: soundNameKey)
         }
     }
     
-    /// システム通知有効化
+    /// Enable system notification
     @Published var enableNotification: Bool {
         didSet {
             defaults.set(enableNotification, forKey: enableNotificationKey)
         }
     }
     
-    /// アプリ起動時に自動復元
+    /// Auto-restore on app launch
     @Published var restoreOnLaunch: Bool {
         didSet {
             defaults.set(restoreOnLaunch, forKey: restoreOnLaunchKey)
         }
     }
     
-    /// スナップショットを永続化しない（プライバシー保護モード）
+    /// Don't persist snapshots (privacy protection mode)
     @Published var disablePersistence: Bool {
         didSet {
             defaults.set(disablePersistence, forKey: disablePersistenceKey)
-            // 有効化時に既存データをクリア
+            // Clear existing data when enabled
             if disablePersistence {
                 ManualSnapshotStorage.shared.clear()
             }
         }
     }
     
-    /// 詳細ログを出力（デバッグ用）
+    /// Output verbose logs (for debugging)
     @Published var verboseLogging: Bool {
         didSet {
             defaults.set(verboseLogging, forKey: verboseLoggingKey)
         }
     }
     
-    /// ログにミリ秒を表示
+    /// Show milliseconds in logs
     @Published var showMilliseconds: Bool {
         didSet {
             defaults.set(showMilliseconds, forKey: showMillisecondsKey)
         }
     }
     
-    /// ログのアプリ名をマスク（プライバシー保護）
+    /// Mask app names in logs (privacy protection)
     @Published var maskAppNamesInLog: Bool {
         didSet {
             defaults.set(maskAppNamesInLog, forKey: maskAppNamesKey)
-            // 設定変更時にマッピングをクリア
+            // Clear mapping when setting changes
             DebugLogger.shared.clearAppNameMapping()
         }
     }
@@ -381,48 +381,48 @@ class SnapshotSettings: ObservableObject {
         self.maskAppNamesInLog = defaults.object(forKey: maskAppNamesKey) as? Bool ?? true
     }
     
-    /// サウンドをプレビュー再生
+    /// Preview sound playback
     func previewSound() {
         NSSound(named: NSSound.Name(soundName))?.play()
     }
     
-    /// 初回遅延を秒単位で取得
+    /// Get initial delay in seconds
     var initialDelaySeconds: Double {
         return initialSnapshotDelay * 60.0
     }
     
-    /// 定期間隔を秒単位で取得
+    /// Get periodic interval in seconds
     var periodicIntervalSeconds: Double {
         return periodicSnapshotInterval * 60.0
     }
 }
 
-// ManualSnapshotStorage: スナップショットの永続化（プライバシー保護版）
+// ManualSnapshotStorage: Snapshot persistence (privacy-protected version)
 class ManualSnapshotStorage {
     static let shared = ManualSnapshotStorage()
     
     private let defaults = UserDefaults.standard
-    private let storageKey = "manualSnapshotDataV2"  // 新形式用のキー
+    private let storageKey = "manualSnapshotDataV2"  // Key for new format
     private let timestampKey = "manualSnapshotTimestamp"
-    private let legacyStorageKey = "manualSnapshotData"  // 旧形式のキー（マイグレーション用）
+    private let legacyStorageKey = "manualSnapshotData"  // Key for old format (for migration)
     
     private init() {
-        // 旧形式データがあれば削除
+        // Remove legacy format data if exists
         if defaults.data(forKey: legacyStorageKey) != nil {
             defaults.removeObject(forKey: legacyStorageKey)
             print("🔄 Removed legacy snapshot data (v1.3.0 migration)")
         }
     }
     
-    /// スナップショットを保存（新形式: WindowMatchInfo）
+    /// Save snapshot (new format: WindowMatchInfo)
     func save(_ snapshots: [[String: [String: WindowMatchInfo]]]) {
-        // 永続化無効の場合はスキップ
+        // Skip if persistence is disabled
         if SnapshotSettings.shared.disablePersistence {
             print("🔒 Persistence disabled: Snapshot not saved")
             return
         }
         
-        // WindowMatchInfoは直接Codable対応
+        // WindowMatchInfo is directly Codable compatible
         if let data = try? JSONEncoder().encode(snapshots) {
             defaults.set(data, forKey: storageKey)
             defaults.set(Date().timeIntervalSince1970, forKey: timestampKey)
@@ -430,7 +430,7 @@ class ManualSnapshotStorage {
         }
     }
     
-    /// スナップショットを読み込み（新形式）
+    /// Load snapshot (new format)
     func load() -> [[String: [String: WindowMatchInfo]]]? {
         guard let data = defaults.data(forKey: storageKey),
               let snapshots = try? JSONDecoder().decode([[String: [String: WindowMatchInfo]]].self, from: data) else {
@@ -445,7 +445,7 @@ class ManualSnapshotStorage {
         return snapshots
     }
     
-    /// 保存日時を取得
+    /// Get save timestamp
     func getTimestamp() -> Date? {
         guard let timestamp = defaults.object(forKey: timestampKey) as? Double else {
             return nil
@@ -453,14 +453,14 @@ class ManualSnapshotStorage {
         return Date(timeIntervalSince1970: timestamp)
     }
     
-    /// スナップショットをクリア
+    /// Clear snapshot
     func clear() {
         defaults.removeObject(forKey: storageKey)
         defaults.removeObject(forKey: timestampKey)
         print("🗑️ Persisted snapshot cleared")
     }
     
-    /// スナップショットが存在するか
+    /// Check if snapshot exists
     var hasSnapshot: Bool {
         return defaults.data(forKey: storageKey) != nil
     }
