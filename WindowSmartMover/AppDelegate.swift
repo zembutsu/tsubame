@@ -641,7 +641,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
         
-        debugPrint("フロントアプリ: \(appName)")
+        debugPrint("フロントアプリ: \(DebugLogger.shared.maskAppName(appName))")
         
         // Accessibility APIでウィンドウを取得
         let appRef = AXUIElementCreateApplication(frontApp.processIdentifier)
@@ -1063,7 +1063,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                     // タイトル情報を含めてログ出力（詳細モード）
                     let titleInfo = windowTitle != nil ? "title:✓" : "title:✗"
                     let sizeInfo = "\(Int(frame.width))x\(Int(frame.height))"
-                    verbosePrint("  保存: \(ownerName) @ (\(Int(frame.origin.x)), \(Int(frame.origin.y))) [\(sizeInfo)] [\(titleInfo)]")
+                    verbosePrint("  保存: \(DebugLogger.shared.maskAppName(ownerName)) @ (\(Int(frame.origin.x)), \(Int(frame.origin.y))) [\(sizeInfo)] [\(titleInfo)]")
                     break
                 }
             }
@@ -1174,9 +1174,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                                         if posResult == .success {
                                             restoredCount += 1
                                             let sizeInfo = sizeRestored ? "+サイズ" : ""
-                                            debugPrint("    ✅ \(ownerName) を (\(Int(savedFrame.origin.x)), \(Int(savedFrame.origin.y))) に復元\(sizeInfo)")
+                                            debugPrint("    ✅ \(DebugLogger.shared.maskAppName(ownerName)) を (\(Int(savedFrame.origin.x)), \(Int(savedFrame.origin.y))) に復元\(sizeInfo)")
                                         } else {
-                                            debugPrint("    ❌ \(ownerName) の移動失敗: \(posResult.rawValue)")
+                                            debugPrint("    ❌ \(DebugLogger.shared.maskAppName(ownerName)) の移動失敗: \(posResult.rawValue)")
                                         }
                                     }
                                     break
@@ -1360,7 +1360,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             if let ownerName = window[kCGWindowOwnerName as String] as? String,
                let cgWindowID = window[kCGWindowNumber as String] as? CGWindowID,
                let layer = window[kCGWindowLayer as String] as? Int, layer == 0 {
-                verbosePrint("    現在: \(ownerName) (ID:\(cgWindowID))")
+                verbosePrint("    現在: \(DebugLogger.shared.maskAppName(ownerName)) (ID:\(cgWindowID))")
             }
         }
         
@@ -1460,9 +1460,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                                         if posResult == .success {
                                             restoredCount += 1
                                             let sizeInfo = sizeRestored ? "+サイズ" : ""
-                                            debugPrint("    ✅ \(ownerName) を (\(Int(savedFrame.origin.x)), \(Int(savedFrame.origin.y))) に復元\(sizeInfo)")
+                                            debugPrint("    ✅ \(DebugLogger.shared.maskAppName(ownerName)) を (\(Int(savedFrame.origin.x)), \(Int(savedFrame.origin.y))) に復元\(sizeInfo)")
                                         } else {
-                                            debugPrint("    ❌ \(ownerName) の移動失敗: \(posResult.rawValue)")
+                                            debugPrint("    ❌ \(DebugLogger.shared.maskAppName(ownerName)) の移動失敗: \(posResult.rawValue)")
                                         }
                                     }
                                     matchFound = true
