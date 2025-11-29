@@ -1,11 +1,18 @@
 # Changelog
 
-All notable changes to WindowSmartMover will be documented in this file.
+All notable changes to Tsubame will be documented in this file.
 
 The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.0.0/),
 and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0.html).
 
 ## [Unreleased]
+
+### Changed
+- **Repository renamed** (#10)
+  - GitHub repository: `WindowSmartMover` → `tsubame`
+  - Display Name: `Window Smart Mover` → `Tsubame`
+  - Old URLs automatically redirect to new location
+  - Bundle Identifier unchanged (user settings preserved)
 
 ### Future Tasks
 - Internationalization (i18n) - English default + Japanese localization

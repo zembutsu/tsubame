@@ -1,4 +1,4 @@
-# WindowSmartMover
+# Tsubame - Window Smart Mover for macOS
 
 [English](README.md) | [日本語](README_ja.md)
 
@@ -6,8 +6,8 @@
 ![macOS](https://img.shields.io/badge/macOS-14.0+-blue)
 ![Swift](https://img.shields.io/badge/Swift-6.2-orange)
 ![License](https://img.shields.io/badge/License-MIT-green)
-![GitHub release](https://img.shields.io/github/v/release/zembutsu/WindowSmartMover)
-![GitHub downloads](https://img.shields.io/github/downloads/zembutsu/WindowSmartMover/total)
+![GitHub release](https://img.shields.io/github/v/release/zembutsu/tsubame)
+![GitHub downloads](https://img.shields.io/github/downloads/zembutsu/tsubame/total)
 
 macOS で複数ディスプレイを利用する時に役立つ、シンプルなウィンドウ管理（ショートカット移動・位置の記憶）ツールです。
 
@@ -31,8 +31,8 @@ macOS で複数ディスプレイを利用する時に役立つ、シンプル�
 
 ## インストール
 
-1. [Releases](https://github.com/zembutsu/WindowSmartMover/releases)から最新版をダウンロード
-2. `WindowSmartMover.app` を `/Applications/` に移動
+1. [Releases](https://github.com/zembutsu/tsubame/releases)から最新版をダウンロード
+2. `Tsubame.app` を `/Applications/` に移動
 3. アプリを起動し、アクセシビリティ権限を許可
 
 ## 使い方

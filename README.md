@@ -1,4 +1,4 @@
-# WindowSmartMover
+# Tsubame - Window Smart Mover for macOS 
 
 [English](README.md) | [日本語](README_ja.md)
 
@@ -7,8 +7,8 @@ A lightweight macOS menu bar app for effortless window management across multipl
 ![macOS](https://img.shields.io/badge/macOS-14.0+-blue)
 ![Swift](https://img.shields.io/badge/Swift-6.2-orange)
 ![License](https://img.shields.io/badge/License-MIT-green)
-![GitHub release](https://img.shields.io/github/v/release/zembutsu/WindowSmartMover)
-![GitHub downloads](https://img.shields.io/github/downloads/zembutsu/WindowSmartMover/total)
+![GitHub release](https://img.shields.io/github/v/release/zembutsu/tsubame)
+![GitHub downloads](https://img.shields.io/github/downloads/zembutsu/tsubame/total)
 
 ## Features
 
@@ -108,7 +108,7 @@ A lightweight macOS menu bar app for effortless window management across multipl
 
 For detailed development progress, see [CHANGELOG.md](CHANGELOG.md).
 
-## Why WindowSmartMover?
+## Why Tsubame?
 
 ### The Problem with Existing Solutions
 
@@ -117,7 +117,7 @@ Most window management apps are either:
 - **Closed source**: You can't verify what they're doing
 - **Cloud-dependent**: Require accounts and subscriptions
 
-WindowSmartMover is:
+Tsubame is:
 - ✅ **Simple**: Does one thing well
 - ✅ **Open Source**: Full transparency
 - ✅ **Privacy-First**: Everything stays on your Mac
@@ -140,6 +140,10 @@ While aware of competing solutions like Rectangle and Magnet, I deliberately cho
 
 This project embodies the philosophy: **understand deeply by building yourself**.
 
+### The Name
+
+"Tsubame" (燕) means "swallow" in Japanese - the bird known for its swift, agile flight. Just as swallows dart effortlessly between locations, this app helps your windows move seamlessly between displays. The name also references "燕返し" (tsubame-gaeshi), a sword technique famous for its quick reversal - fitting for an app that restores windows to their original positions.
+
 ## Installation
 
 ### Requirements
@@ -148,12 +152,12 @@ This project embodies the philosophy: **understand deeply by building yourself**
 
 ### Download & Install
 
-1. Download the latest release from [Releases](https://github.com/zembutsu/WindowSmartMover/releases)
-2. Move `WindowSmartMover.app` to `/Applications/`
+1. Download the latest release from [Releases](https://github.com/zembutsu/tsubame/releases)
+2. Move `Tsubame.app` to `/Applications/`
 3. Launch the app
 4. Grant Accessibility permissions when prompted:
    - System Settings → Privacy & Security → Accessibility
-   - Enable WindowSmartMover
+   - Enable Tsubame
 
 ## Usage
 
@@ -200,8 +204,8 @@ This project embodies the philosophy: **understand deeply by building yourself**
 
 ```bash
 # Clone the repository
-git clone https://github.com/zembutsu/WindowSmartMover.git
-cd WindowSmartMover
+git clone https://github.com/zembutsu/tsubame.git
+cd tsubame
 
 # Open in Xcode
 open WindowSmartMover.xcodeproj
