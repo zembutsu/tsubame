@@ -7,7 +7,85 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Planned (v1.3.0)
+### Future Tasks
+- Format floating-point delay display (e.g., `3.0000000000000004` → `3.0`)
+
+## [1.2.6] - 2025-11-29
+
+### Added
+- **Privacy-aware Window Matching** (#14)
+  - App names and window titles are now hashed (SHA256) before storage
+  - Protects user privacy: stored data reveals no information about opened apps or content
+  - Fallback matching strategy: title hash → size match → app-only match
+  - Windows can now be restored after app restart (CGWindowID no longer required)
+- **Position Proximity Matching**
+  - When multiple windows have the same size, the window closest to the saved position is selected
+  - Prevents cross-display mismatches when restoring windows
+  - Distance (in pixels) shown in verbose logs for debugging
+- **Privacy Protection Mode**
+  - New setting: "Don't persist snapshots" option
+  - When enabled, all snapshot data is cleared on app quit
+  - Existing data is immediately cleared when enabling this option
+  - For users who want no data written to disk
+- **Verbose Logging Option**
+  - New setting: "Enable verbose logging" toggle
+  - When disabled (default), only essential logs are output
+  - When enabled, detailed matching info (targets, candidates, distances) is shown
+  - Useful for troubleshooting window restoration issues
+
+### Changed
+- **Snapshot data format upgraded to v2**
+  - New structure using `WindowMatchInfo` with hashed identifiers
+  - Old format data (v1.2.x) is automatically discarded on first launch
+  - Users need to save snapshots again after upgrading
+- **Unified window matching for auto-restore** (#17)
+  - Display reconnection restore now uses `WindowMatchInfo` format (same as manual snapshots)
+  - Shares `findMatchingWindow()` logic between manual and auto restore
+  - Position proximity matching now applies to auto-restore as well
+- **CGWindowID priority matching** (#17)
+  - Within the same session, CGWindowID is used for exact window identification
+  - Prevents window mix-ups when multiple windows have the same size
+  - Falls back to title/size/app matching after app restart
+
+### Fixed
+- **Stale window position data in auto-snapshot** (#17)
+  - `takeWindowSnapshot()` now clears old data before rebuilding
+  - Prevents phantom entries when windows move between displays
+  - Only updates when 2+ displays connected (preserves data during disconnection)
+  - Backs up and restores external display data if timing causes empty snapshot
+- **CGWindowID matching now verifies app name** (#17)
+  - Added appNameHash check to prevent theoretical cross-app mismatches
+- **Improved duplicate match prevention** (#17)
+  - CGWindowID-matched windows are marked as used even if already on external display
+  - Prevents same window from matching multiple saved entries
+- **Clearer log messages for external display windows** (#17)
+  - "Already on external display" vs "Not on main screen (skip)" distinction
+
+### Security
+- Position and size data remain in plaintext (required for restoration)
+- Threat model consideration: Accessing UserDefaults requires local file system access, 
+  at which point an attacker likely has more direct means of observation
+- This improvement reduces incidental data exposure in backups and sync scenarios
+
+### Technical Details
+- Added `WindowMatchInfo` struct with `appNameHash`, `titleHash`, `size`, and `frame` fields
+- Implemented SHA256 hashing using CryptoKit framework
+- Added `findMatchingWindow()` with priority-based fallback matching
+- Position proximity sorting for same-size window candidates
+- Storage key changed from `manualSnapshotData` to `manualSnapshotDataV2`
+- Added `disablePersistence` property to `SnapshotSettings`
+- Added `verboseLogging` property with `verbosePrint()` function
+- Added `applicationWillTerminate()` for cleanup on quit
+- `windowPositions` type changed to `[String: [String: WindowMatchInfo]]`
+- `takeWindowSnapshot()` includes external display backup mechanism
+- `findMatchingWindow()` accepts `preferredCGWindowID` parameter for exact matching
+
+### Migration Notes
+- **Breaking change**: Saved snapshots from v1.2.x will be cleared
+- After upgrading, use ⌃⌥⌘↑ to save a new snapshot
+- Privacy protection mode is OFF by default (existing behavior preserved)
+
+### Planned (Future)
 - **Manual Window Snapshot & Restore**: Enhanced features
   - Visual notification feedback (screen flash, sound)
   - Multiple snapshot slots with UI selection
@@ -17,7 +95,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Japanese localization
   - Localized debug logs for international users
 
-### Future Considerations (Post v1.3.0)
+### Future Considerations (Post v1.2.6)
 - Per-app window restoration rules
 - Window size restoration (currently position only)
 - Support for more than 2 displays
