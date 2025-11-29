@@ -7,14 +7,23 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+
 ### Planned: v1.3.0 (Stable Release)
-- Internationalization (i18n) - English default + Japanese localization
 - App Store release preparation
 - Binary distribution via GitHub Releases
 
 ## [1.2.8] - WIP
 
 ### Added
+- **Internationalization (i18n)** (#2)
+  - English as default UI language
+  - Japanese localization via Localizable.strings
+  - In-app language switcher (Settings → Basic → Language)
+    - System Default: Follow macOS system language
+    - English: Force English UI
+    - 日本語: Force Japanese UI
+  - All debug logs output in English regardless of UI language
+  - All code comments translated to English for international contributors
 - **Startup Information in Debug Log** (#21)
   - Display app version and build number on launch
   - Show current settings summary (hotkey, timing, options)
@@ -33,9 +42,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Bundle Identifier unchanged (user settings preserved)
 
 ### Technical Details
+- Implemented NSLocalizedString for all 80+ UI strings
+- Created ja.lproj/Localizable.strings for Japanese translations
+- Added LanguageSettings class with AppleLanguages UserDefaults
+- Fixed deprecated onChange(of:perform:) warning (macOS 14.0+)
 - Added `maskAppNamesInLog` property to `SnapshotSettings`
 - Added `maskAppName()` and `clearAppNameMapping()` to `DebugLogger`
 - Applied masking to all log outputs containing app names
+
 
 ## [1.2.7] - 2025-11-29
 

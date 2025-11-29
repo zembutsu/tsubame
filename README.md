@@ -94,6 +94,19 @@ A lightweight macOS menu bar app for effortless window management across multipl
   - Optional millisecond timestamps for precise timing analysis
   - Enable in Settings → Debug → "Show milliseconds"
 
+### Internationalization (v1.2.8+)
+- **Multi-language Support**: Use Tsubame in your preferred language
+  - English as default UI language
+  - Japanese localization included
+  - In-app language switcher (Settings → Basic → Language)
+- **Language Options**:
+  - System Default: Follow macOS system language
+  - English: Force English UI
+  - 日本語: Force Japanese UI
+- **Developer-Friendly**: All debug logs in English regardless of UI language
+  - Enables international collaboration on bug reports
+  - Code comments also in English for contributors
+
 ### Coming Soon 🚧
 
 ⚠️ **Note**: These features are under active development.
@@ -101,10 +114,6 @@ A lightweight macOS menu bar app for effortless window management across multipl
 - **Enhanced Snapshot Features**:
   - Multiple snapshot slots with UI selection
   - Snapshot management interface (list, rename, delete)
-- **Internationalization (English UI + Japanese localization)**
-  - English as default language
-  - Japanese localization
-  - Localized debug logs for international users
 
 For detailed development progress, see [CHANGELOG.md](CHANGELOG.md).
 
@@ -179,59 +188,27 @@ This project embodies the philosophy: **understand deeply by building yourself**
 3. Choose your preferred modifier keys
 4. Restart the app
 
+### Changing Language
+1. Click the menu bar icon
+2. Select "Settings..."
+3. In the "Language" section, select your preferred language
+4. Click "Restart Now" when prompted (or restart later)
+
 ### Configuring Display Reconnection Timing
 1. Click the menu bar icon
 2. Select "Settings..."
 3. Adjust timing settings:
    - **Display Change Detection Stabilization Time**: How long to wait for display configuration to settle (0.1-3.0s)
-   - **Window Restore Delay**: How long to wait for macOS to update window coordinates (0.1-10.0s)
-4. Changes take effect immediately on next display reconnection
+   - **Window Restore Delay**: Additional delay before moving windows (0.1-10.0s)
 
-### Using Debug Logs
-1. Click the menu bar icon
-2. Select "Show Debug Log"
-3. View real-time logs of window operations
-4. Use "Copy" to save logs for issue reporting
-5. Use "Clear" to reset the log buffer
+### Manual Snapshot Usage
+1. Arrange your windows as desired on external display
+2. Press `⌃⌘↑` to save the layout (or use menu)
+3. Later, press `⌃⌘↓` to restore (or use menu)
 
-## Building from Source
+## Configuration Guide
 
-### Prerequisites
-- Xcode 15.0 or later
-- macOS 14.0+ SDK
-
-### Build Steps
-
-```bash
-# Clone the repository
-git clone https://github.com/zembutsu/tsubame.git
-cd tsubame
-
-# Open in Xcode
-open WindowSmartMover.xcodeproj
-
-# Build and run (⌘R)
-```
-
-### Code Signing
-
-For local development, you can use "Sign to Run Locally" in Xcode. For distribution, you'll need an Apple Developer account.
-
-## Known Issues
-
-### Window Control
-- Some apps (e.g., system dialogs) don't respond to programmatic window control
-- Fullscreen windows cannot be moved
-- Display reconnection timing may vary by hardware
-
-### Display & Sleep/Wake
-- **Dock menu misalignment after sleep/wake** (largely resolved in v1.2.2)
-  - Most cases resolved by improved stabilization timing
-  - Remaining cases may be caused by other menu bar apps
-  - **Workaround**: Run `killall Dock` in Terminal to reset
-  - See GitHub Issues for updates
-
-### Display Timing Recommendations
+### Timing Optimization
 
 Default settings (12 second total delay) work for most users, but you can optimize:
 
@@ -275,13 +252,21 @@ The debug log viewer helps diagnose issues:
 
 **Privacy Note**: Debug logs are stored in memory only and contain:
 - Display IDs (numeric identifiers, no personal info)
-- Application names
+- Application names (masked by default since v1.2.8)
 - Window coordinates
 - System events
 
 No sensitive information is logged or transmitted.
 
 ## Roadmap
+
+### Completed (v1.2.8)
+- [x] Internationalization (English UI + Japanese localization) (#2)
+- [x] In-app language switcher
+- [x] All debug logs in English
+- [x] Code comments translated to English
+- [x] App name masking in logs (#21)
+- [x] Startup information in debug log (#21)
 
 ### Completed (v1.2.7)
 - [x] Changed default hotkey from ⌃⌥⌘ to ⌃⌘ (#5)
@@ -335,9 +320,8 @@ No sensitive information is logged or transmitted.
 - [x] Debug log viewer with copy functionality
 
 ### In Development (v1.3.0)
-- [ ] Internationalization (English UI + Japanese localization)
-- [ ] Localized debug logs
 - [ ] App Store release preparation
+- [ ] Binary distribution via GitHub Releases
 
 ### Future Considerations (Post v1.3.0)
 - [ ] Enhanced snapshot features (multiple slots with UI selection)
@@ -345,6 +329,7 @@ No sensitive information is logged or transmitted.
 - [ ] Support for more than 2 displays
 - [ ] Per-app window restoration rules
 - [ ] Export/Import snapshots as JSON
+- [ ] Improved restart UX for settings changes
 
 For detailed development plans, see [CHANGELOG.md](CHANGELOG.md).
 
