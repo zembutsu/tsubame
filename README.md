@@ -140,6 +140,10 @@ While aware of competing solutions like Rectangle and Magnet, I deliberately cho
 
 This project embodies the philosophy: **understand deeply by building yourself**.
 
+### The Name
+
+"Tsubame" (燕) means "swallow" in Japanese - the bird known for its swift, agile flight. Just as swallows dart effortlessly between locations, this app helps your windows move seamlessly between displays. The name also references "燕返し" (tsubame-gaeshi), a sword technique famous for its quick reversal - fitting for an app that restores windows to their original positions.
+
 ## Installation
 
 ### Requirements
