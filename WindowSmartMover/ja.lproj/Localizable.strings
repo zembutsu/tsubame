@@ -1,0 +1,128 @@
+/* 
+   Localizable.strings (Japanese)
+   Tsubame - Window Smart Mover
+   
+   Japanese localization file
+*/
+
+// MARK: - Menu Items
+
+"Move Window to Next Screen (%@→)" = "ウィンドウを次の画面へ (%@→)";
+"Move Window to Previous Screen (%@←)" = "ウィンドウを前の画面へ (%@←)";
+"📸 Save Layout (%@↑)" = "📸 配置を保存 (%@↑)";
+"📥 Restore Layout (%@↓)" = "📥 配置を復元 (%@↓)";
+"Settings..." = "設定...";
+"Show Debug Log" = "デバッグログを表示";
+"About Tsubame" = "Tsubame について";
+"Quit" = "終了";
+
+// MARK: - Snapshot Status
+
+"    💾 %d windows @ %@" = "    💾 %d個 @ %@";
+"    💾 No data" = "    💾 データなし";
+
+// MARK: - Window Titles
+
+"Settings" = "設定";
+"Debug Log" = "デバッグログ";
+
+// MARK: - Debug Log View
+
+"Clear" = "クリア";
+"Copy" = "コピー";
+"Close" = "閉じる";
+"No logs available" = "ログがありません";
+
+// MARK: - Settings View - General
+
+"Reset to Defaults" = "デフォルトに戻す";
+"⚠️ Some settings require restart" = "⚠️ 一部の設定は再起動が必要";
+
+// MARK: - Settings View - Shortcut Keys
+
+"Shortcut Keys" = "ショートカットキー";
+"Select modifier keys:" = "修飾キーを選択：";
+"Move between screens:" = "画面間移動：";
+"Snapshot:" = "スナップショット：";
+
+// MARK: - Settings View - Window Position
+
+"Window Position Adjustment" = "ウィンドウ位置微調整";
+"Move amount:" = "移動量:";
+
+// MARK: - Settings View - Auto Snapshot
+
+"Auto Snapshot" = "自動スナップショット";
+"Auto-restore on app launch" = "アプリ起動時に自動復元";
+"Restores saved snapshot when the app starts" = "起動時に保存済みスナップショットを復元します";
+"Initial capture delay:" = "初回取得までの時間:";
+"Periodic auto-capture" = "定期的に自動取得";
+"Capture interval:" = "取得間隔:";
+"Protect existing data" = "既存データを保護";
+"Minimum windows:" = "最小ウィンドウ数:";
+"(skip if fewer)" = "個未満は上書きしない";
+
+// MARK: - Settings View - Privacy
+
+"Privacy" = "プライバシー";
+"Don't persist snapshots" = "スナップショットを永続化しない";
+"When enabled, all data is cleared on app quit" = "有効にすると、アプリ終了時にすべてのデータが消去されます";
+
+// MARK: - Settings View - Notifications
+
+"Notifications" = "通知";
+"Sound" = "サウンド";
+"System notification" = "システム通知";
+"Sound:" = "サウンド:";
+"Preview sound" = "プレビュー再生";
+
+// MARK: - Settings View - Debug
+
+"Debug" = "デバッグ";
+"Verbose logging" = "詳細ログを出力";
+"Show milliseconds" = "ミリ秒を表示";
+"Mask app names" = "アプリ名をマスク";
+"Outputs detailed info during snapshot save/restore" = "スナップショット保存・復元時の詳細情報をログに出力します";
+"Last saved: %@" = "最終保存: %@";
+"No saved data" = "保存データなし";
+
+// MARK: - Settings View - Advanced - Timing
+
+"Window Restore Timing" = "ウィンドウ復元タイミング";
+"Display change stabilization time:" = "ディスプレイ変更検出の安定化時間:";
+"%.1fs" = "%.1f秒";
+"%ds" = "%d秒";
+"Wait time for display change events to settle" = "ディスプレイ変更イベントが落ち着くまでの待機時間";
+"Post-connection delay:" = "ディスプレイ接続後の待機時間:";
+"Wait for macOS to finish updating window coordinates" = "macOSがウィンドウ座標を更新し終わるまでの待機時間";
+"Window position monitoring interval:" = "ウィンドウ位置の監視間隔:";
+"For auto-restore on display reconnection" = "ディスプレイ再接続時の自動復元用";
+
+// MARK: - Settings View - Advanced - Sleep
+
+"Sleep Behavior" = "スリープ時の動作";
+"Pause display monitoring during sleep" = "スリープ中はディスプレイ監視を一時停止";
+"Ignores display change events during sleep" = "スリープ中のディスプレイ変更イベントを無視します";
+"Last sleep:" = "前回のスリープ:";
+"%.1f hours" = "%.1f時間";
+"Adjusted delay:" = "調整後の待機:";
+"Monitoring status:" = "監視状態:";
+"Active" = "有効";
+"Paused" = "一時停止中";
+
+// MARK: - Time Formatting
+
+"%dh" = "%d時間";
+"%dh %dm" = "%d時間%d分";
+"%dm" = "%d分";
+"%.1fm" = "%.1f分";
+
+// MARK: - About View
+
+"Shortcuts" = "ショートカット";
+"Move between screens" = "画面間移動";
+"Snapshot" = "スナップショット";
+"Position adjustment" = "位置微調整";
+"Information" = "情報";
+"Developer" = "開発者";
+"License" = "ライセンス";

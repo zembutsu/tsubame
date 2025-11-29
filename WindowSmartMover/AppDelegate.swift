@@ -19,7 +19,7 @@ private func hotKeyHandler(nextHandler: EventHandlerCallRef?, event: EventRef?, 
         return OSStatus(eventNotHandledErr)
     }
     
-    print("🔥 ホットキーが押されました: ID = \(hotKeyID.id)")
+    print("🔥 Hotkey pressed: ID = \(hotKeyID.id)")
     
     DispatchQueue.main.async {
         switch hotKeyID.id {
@@ -83,7 +83,7 @@ class DebugLogger {
         logs.removeAll()
     }
     
-    /// アプリ名をマスクする（設定に応じて）
+    /// アプリ名をマスクする(設定に応じて)
     func maskAppName(_ name: String) -> String {
         guard SnapshotSettings.shared.maskAppNamesInLog else {
             return name  // マスクOFFなら元の名前
@@ -104,7 +104,7 @@ class DebugLogger {
     }
 }
 
-// デバッグログ表示用のSwiftUIビュー
+// Debug log viewer SwiftUI view
 struct DebugLogView: View {
     @State private var logs: String
     @Environment(\.dismiss) private var dismiss
@@ -115,22 +115,22 @@ struct DebugLogView: View {
     
     var body: some View {
         VStack(spacing: 0) {
-            // ヘッダー
+            // Header
             HStack {
-                Text("デバッグログ")
+                Text(NSLocalizedString("Debug Log", comment: "Debug log viewer title"))
                     .font(.headline)
                 Spacer()
-                Button("クリア") {
+                Button(NSLocalizedString("Clear", comment: "Button to clear logs")) {
                     DebugLogger.shared.clearLogs()
                     logs = DebugLogger.shared.getAllLogs()
                 }
                 .disabled(logs.isEmpty)
-                Button("コピー") {
+                Button(NSLocalizedString("Copy", comment: "Button to copy logs to clipboard")) {
                     NSPasteboard.general.clearContents()
                     NSPasteboard.general.setString(logs, forType: .string)
                 }
                 .disabled(logs.isEmpty)
-                Button("閉じる") {
+                Button(NSLocalizedString("Close", comment: "Button to close window")) {
                     dismiss()
                 }
             }
@@ -138,9 +138,9 @@ struct DebugLogView: View {
             
             Divider()
             
-            // ログ表示エリア
+            // Log display area
             ScrollView {
-                Text(logs.isEmpty ? "ログがありません" : logs)
+                Text(logs.isEmpty ? NSLocalizedString("No logs available", comment: "Message when log is empty") : logs)
                     .font(.system(.body, design: .monospaced))
                     .frame(maxWidth: .infinity, alignment: .leading)
                     .padding()
@@ -155,23 +155,23 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     var statusItem: NSStatusItem?
     var hotKeyRef: EventHotKeyRef?
     var hotKeyRef2: EventHotKeyRef?
-    var hotKeyRef3: EventHotKeyRef?  // スナップショット保存（↑）
-    var hotKeyRef4: EventHotKeyRef?  // スナップショット復元（↓）
-    var hotKeyRef5: EventHotKeyRef?  // ウィンドウ微調整（W: 上）
-    var hotKeyRef6: EventHotKeyRef?  // ウィンドウ微調整（A: 左）
-    var hotKeyRef7: EventHotKeyRef?  // ウィンドウ微調整（S: 下）
-    var hotKeyRef8: EventHotKeyRef?  // ウィンドウ微調整（D: 右）
+    var hotKeyRef3: EventHotKeyRef?  // スナップショット保存(↑)
+    var hotKeyRef4: EventHotKeyRef?  // スナップショット復元(↓)
+    var hotKeyRef5: EventHotKeyRef?  // ウィンドウ微調整(W: 上)
+    var hotKeyRef6: EventHotKeyRef?  // ウィンドウ微調整(A: 左)
+    var hotKeyRef7: EventHotKeyRef?  // ウィンドウ微調整(S: 下)
+    var hotKeyRef8: EventHotKeyRef?  // ウィンドウ微調整(D: 右)
     var eventHandler: EventHandlerRef?
     var settingsWindow: NSWindow?
     var aboutWindow: NSWindow?
     var debugWindow: NSWindow?
     
-    // ディスプレイ記憶機能（新形式: WindowMatchInfo使用）
+    // ディスプレイ記憶機能(新形式: WindowMatchInfo使用)
     private var windowPositions: [String: [String: WindowMatchInfo]] = [:]
     private var snapshotTimer: Timer?
     
-    // 手動スナップショット機能（5スロット、将来拡張用）
-    // 新形式: WindowMatchInfo使用（プライバシー保護のためハッシュ化）
+    // 手動スナップショット機能(5スロット、将来拡張用)
+    // 新形式: WindowMatchInfo使用(プライバシー保護のためハッシュ化)
     private var manualSnapshots: [[String: [String: WindowMatchInfo]]] = Array(repeating: [:], count: 5)
     private var currentSlotIndex: Int = 0  // v1.2.3では常に0
     
@@ -183,13 +183,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     // ディスプレイ変更の落ち着き待ちタイマー
     private var displayStabilizationTimer: Timer?
     
-    // 復元処理のワークアイテム（キャンセル可能）
+    // 復元処理のワークアイテム(キャンセル可能)
     private var restoreWorkItem: DispatchWorkItem?
     
     // ディスプレイ監視の有効/無効状態
     private var isDisplayMonitoringEnabled = true
     
-    // 最後のディスプレイ変更時刻（安定化検知用）
+    // 最後のディスプレイ変更時刻(安定化検知用)
     private var lastDisplayChangeTime: Date?
     
     // 安定化確認タイマー
@@ -267,21 +267,21 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // 初回自動スナップショットタイマーを開始
         startInitialSnapshotTimer()
         
-        // 起動時自動復元（設定が有効 かつ スナップショットが存在する場合）
+        // 起動時自動復元(設定が有効 かつ スナップショットが存在する場合)
         if SnapshotSettings.shared.restoreOnLaunch && ManualSnapshotStorage.shared.hasSnapshot {
             let delay = WindowTimingSettings.shared.windowRestoreDelay
             DispatchQueue.main.asyncAfter(deadline: .now() + delay) { [weak self] in
                 if NSScreen.screens.count >= 2 {
-                    debugPrint("🚀 起動時自動復元を実行")
+                    debugPrint("🚀 Executing auto-restore on launch")
                     self?.restoreManualSnapshot()
                 } else {
-                    debugPrint("🚀 起動時自動復元: 外部ディスプレイ未接続のためスキップ")
+                    debugPrint("🚀 Auto-restore on launch: Skipped (no external display connected)")
                 }
             }
         }
         
-        debugPrint("アプリが起動しました")
-        debugPrint("接続されている画面数: \(NSScreen.screens.count)")
+        debugPrint("Application launched")
+        debugPrint("Connected screens: \(NSScreen.screens.count)")
     }
     
     /// 通知センターのセットアップ
@@ -289,14 +289,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let center = UNUserNotificationCenter.current()
         center.requestAuthorization(options: [.alert, .sound]) { granted, error in
             if granted {
-                debugPrint("✅ 通知権限が許可されました")
+                debugPrint("✅ Notification permission granted")
             } else if let error = error {
-                debugPrint("⚠️ 通知権限のリクエストに失敗: \(error.localizedDescription)")
+                debugPrint("⚠️ Failed to request notification permission: \(error.localizedDescription)")
             }
         }
     }
     
-    /// 通知を送信（スナップショット操作用）
+    /// 通知を送信(スナップショット操作用)
     private func sendNotification(title: String, body: String) {
         let settings = SnapshotSettings.shared
         
@@ -321,7 +321,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         UNUserNotificationCenter.current().add(request) { error in
             if let error = error {
-                debugPrint("⚠️ 通知送信エラー: \(error.localizedDescription)")
+                debugPrint("⚠️ Notification error: \(error.localizedDescription)")
             }
         }
     }
@@ -330,44 +330,54 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let menu = NSMenu()
         
         let modifierString = HotKeySettings.shared.getModifierString()
-        menu.addItem(NSMenuItem(title: "ウィンドウを次の画面へ (\(modifierString)→)", action: #selector(moveWindowToNextScreen), keyEquivalent: ""))
-        menu.addItem(NSMenuItem(title: "ウィンドウを前の画面へ (\(modifierString)←)", action: #selector(moveWindowToPrevScreen), keyEquivalent: ""))
+        
+        // Window movement
+        let nextScreenTitle = String(format: NSLocalizedString("Move Window to Next Screen (%@→)", comment: "Menu item for moving window to next screen"), modifierString)
+        menu.addItem(NSMenuItem(title: nextScreenTitle, action: #selector(moveWindowToNextScreen), keyEquivalent: ""))
+        
+        let prevScreenTitle = String(format: NSLocalizedString("Move Window to Previous Screen (%@←)", comment: "Menu item for moving window to previous screen"), modifierString)
+        menu.addItem(NSMenuItem(title: prevScreenTitle, action: #selector(moveWindowToPrevScreen), keyEquivalent: ""))
+        
         menu.addItem(NSMenuItem.separator())
         
-        // スナップショット操作
-        menu.addItem(NSMenuItem(title: "📸 配置を保存 (\(modifierString)↑)", action: #selector(saveManualSnapshot), keyEquivalent: ""))
-        menu.addItem(NSMenuItem(title: "📥 配置を復元 (\(modifierString)↓)", action: #selector(restoreManualSnapshot), keyEquivalent: ""))
+        // Snapshot operations
+        let saveTitle = String(format: NSLocalizedString("📸 Save Layout (%@↑)", comment: "Menu item for saving window layout"), modifierString)
+        menu.addItem(NSMenuItem(title: saveTitle, action: #selector(saveManualSnapshot), keyEquivalent: ""))
         
-        // スナップショット状態
+        let restoreTitle = String(format: NSLocalizedString("📥 Restore Layout (%@↓)", comment: "Menu item for restoring window layout"), modifierString)
+        menu.addItem(NSMenuItem(title: restoreTitle, action: #selector(restoreManualSnapshot), keyEquivalent: ""))
+        
+        // Snapshot status
         let snapshotStatusItem = NSMenuItem(title: getSnapshotStatusString(), action: nil, keyEquivalent: "")
         snapshotStatusItem.isEnabled = false
         menu.addItem(snapshotStatusItem)
         
         menu.addItem(NSMenuItem.separator())
-        menu.addItem(NSMenuItem(title: "設定...", action: #selector(openSettings), keyEquivalent: ","))
-        menu.addItem(NSMenuItem(title: "デバッグログを表示", action: #selector(showDebugLog), keyEquivalent: "d"))
+        menu.addItem(NSMenuItem(title: NSLocalizedString("Settings...", comment: "Menu item to open settings"), action: #selector(openSettings), keyEquivalent: ","))
+        menu.addItem(NSMenuItem(title: NSLocalizedString("Show Debug Log", comment: "Menu item to show debug log"), action: #selector(showDebugLog), keyEquivalent: "d"))
         menu.addItem(NSMenuItem.separator())
-        menu.addItem(NSMenuItem(title: "About Tsubame", action: #selector(openAbout), keyEquivalent: ""))
+        menu.addItem(NSMenuItem(title: NSLocalizedString("About Tsubame", comment: "Menu item to show about window"), action: #selector(openAbout), keyEquivalent: ""))
         menu.addItem(NSMenuItem.separator())
-        menu.addItem(NSMenuItem(title: "終了", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
+        menu.addItem(NSMenuItem(title: NSLocalizedString("Quit", comment: "Menu item to quit application"), action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q"))
         
         statusItem?.menu = menu
     }
     
-    /// スナップショット状態の文字列を生成
+    /// Generate snapshot status string
     private func getSnapshotStatusString() -> String {
         if let timestamp = ManualSnapshotStorage.shared.getTimestamp() {
             let formatter = DateFormatter()
             formatter.dateFormat = "HH:mm"
             let timeStr = formatter.string(from: timestamp)
             
-            // 保存されているウィンドウ数をカウント
+            // Count saved windows
             let snapshot = manualSnapshots[currentSlotIndex]
             let windowCount = snapshot.values.reduce(0) { $0 + $1.count }
             
-            return "    💾 \(windowCount)個 @ \(timeStr)"
+            let format = NSLocalizedString("    💾 %d windows @ %@", comment: "Snapshot status with window count and time")
+            return String(format: format, windowCount, timeStr)
         } else {
-            return "    💾 データなし"
+            return NSLocalizedString("    💾 No data", comment: "Snapshot status when no data exists")
         }
     }
     
@@ -377,7 +387,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             let hostingController = NSHostingController(rootView: settingsView)
             
             let window = NSWindow(contentViewController: hostingController)
-            window.title = "設定"
+            window.title = NSLocalizedString("Settings", comment: "Settings window title")
             window.styleMask = [.titled, .closable]
             window.center()
             window.level = .floating
@@ -408,12 +418,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
     
     @objc func showDebugLog() {
-        // 毎回新しいウィンドウを作成して最新のログを表示
+        // Create new window each time to show latest logs
         let debugView = DebugLogView()
         let hostingController = NSHostingController(rootView: debugView)
         
         let window = NSWindow(contentViewController: hostingController)
-        window.title = "デバッグログ"
+        window.title = NSLocalizedString("Debug Log", comment: "Debug log window title")
         window.styleMask = [.titled, .closable, .resizable]
         window.center()
         window.level = .floating
@@ -429,9 +439,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let accessEnabled = AXIsProcessTrustedWithOptions(options)
         
         if accessEnabled {
-            debugPrint("✅ アクセシビリティ権限が付与されています")
+            debugPrint("✅ Accessibility permission granted")
         } else {
-            debugPrint("⚠️ アクセシビリティ権限が必要です")
+            debugPrint("⚠️ Accessibility permission required")
         }
     }
     
@@ -441,9 +451,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let status = InstallEventHandler(GetApplicationEventTarget(), hotKeyHandler, 1, &eventType, nil, &eventHandler)
         
         if status == noErr {
-            debugPrint("✅ イベントハンドラのインストール成功")
+            debugPrint("✅ Event handler installed successfully")
         } else {
-            debugPrint("❌ イベントハンドラのインストール失敗: \(status)")
+            debugPrint("❌ Failed to install event handler: \(status)")
         }
         
         // ホットキーを登録
@@ -457,9 +467,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         if registerStatus1 == noErr {
             let modifierString = settings.getModifierString()
-            debugPrint("✅ ホットキー1 (\(modifierString)→) の登録成功")
+            debugPrint("✅ Hotkey 1 (\(modifierString)→) registered")
         } else {
-            debugPrint("❌ ホットキー1の登録失敗: \(registerStatus1)")
+            debugPrint("❌ Failed to register hotkey 1: \(registerStatus1)")
         }
         
         // 2つ目のホットキー: 前の画面へ (左矢印)
@@ -469,9 +479,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         if registerStatus2 == noErr {
             let modifierString = settings.getModifierString()
-            debugPrint("✅ ホットキー2 (\(modifierString)←) の登録成功")
+            debugPrint("✅ Hotkey 2 (\(modifierString)←) registered")
         } else {
-            debugPrint("❌ ホットキー2の登録失敗: \(registerStatus2)")
+            debugPrint("❌ Failed to register hotkey 2: \(registerStatus2)")
         }
         
         // 3つ目のホットキー: スナップショット保存 (上矢印)
@@ -481,9 +491,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         if registerStatus3 == noErr {
             let modifierString = settings.getModifierString()
-            debugPrint("✅ ホットキー3 (\(modifierString)↑) の登録成功")
+            debugPrint("✅ Hotkey 3 (\(modifierString)↑) registered")
         } else {
-            debugPrint("❌ ホットキー3の登録失敗: \(registerStatus3)")
+            debugPrint("❌ Failed to register hotkey 3: \(registerStatus3)")
         }
         
         // 4つ目のホットキー: スナップショット復元 (下矢印)
@@ -493,9 +503,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         if registerStatus4 == noErr {
             let modifierString = settings.getModifierString()
-            debugPrint("✅ ホットキー4 (\(modifierString)↓) の登録成功")
+            debugPrint("✅ Hotkey 4 (\(modifierString)↓) registered")
         } else {
-            debugPrint("❌ ホットキー4の登録失敗: \(registerStatus4)")
+            debugPrint("❌ Failed to register hotkey 4: \(registerStatus4)")
         }
         
         // 5つ目のホットキー: ウィンドウ微調整・上 (W)
@@ -505,9 +515,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         if registerStatus5 == noErr {
             let modifierString = settings.getModifierString()
-            debugPrint("✅ ホットキー5 (\(modifierString)W) の登録成功")
+            debugPrint("✅ Hotkey 5 (\(modifierString)W) registered")
         } else {
-            debugPrint("❌ ホットキー5の登録失敗: \(registerStatus5)")
+            debugPrint("❌ Failed to register hotkey 5: \(registerStatus5)")
         }
         
         // 6つ目のホットキー: ウィンドウ微調整・左 (A)
@@ -517,9 +527,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         if registerStatus6 == noErr {
             let modifierString = settings.getModifierString()
-            debugPrint("✅ ホットキー6 (\(modifierString)A) の登録成功")
+            debugPrint("✅ Hotkey 6 (\(modifierString)A) registered")
         } else {
-            debugPrint("❌ ホットキー6の登録失敗: \(registerStatus6)")
+            debugPrint("❌ Failed to register hotkey 6: \(registerStatus6)")
         }
         
         // 7つ目のホットキー: ウィンドウ微調整・下 (S)
@@ -529,9 +539,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         if registerStatus7 == noErr {
             let modifierString = settings.getModifierString()
-            debugPrint("✅ ホットキー7 (\(modifierString)S) の登録成功")
+            debugPrint("✅ Hotkey 7 (\(modifierString)S) registered")
         } else {
-            debugPrint("❌ ホットキー7の登録失敗: \(registerStatus7)")
+            debugPrint("❌ Failed to register hotkey 7: \(registerStatus7)")
         }
         
         // 8つ目のホットキー: ウィンドウ微調整・右 (D)
@@ -541,9 +551,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         if registerStatus8 == noErr {
             let modifierString = settings.getModifierString()
-            debugPrint("✅ ホットキー8 (\(modifierString)D) の登録成功")
+            debugPrint("✅ Hotkey 8 (\(modifierString)D) registered")
         } else {
-            debugPrint("❌ ホットキー8の登録失敗: \(registerStatus8)")
+            debugPrint("❌ Failed to register hotkey 8: \(registerStatus8)")
         }
     }
     
@@ -567,40 +577,40 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         case right
     }
     
-    /// ウィンドウを微調整（指定方向にピクセル単位で移動）
+    /// Nudge window (move by pixels in specified direction)
     func nudgeWindow(direction: NudgeDirection) {
         let pixels = HotKeySettings.shared.nudgePixels
         let directionName: String
         switch direction {
-        case .up: directionName = "上"
-        case .down: directionName = "下"
-        case .left: directionName = "左"
-        case .right: directionName = "右"
+        case .up: directionName = "up"
+        case .down: directionName = "down"
+        case .left: directionName = "left"
+        case .right: directionName = "right"
         }
-        debugPrint("📐 ウィンドウを\(directionName)に\(pixels)px移動")
+        debugPrint("📐 Moving window \(directionName) by \(pixels)px")
         
-        // フロントのアプリケーションを取得
+        // Get frontmost application
         guard let frontApp = NSWorkspace.shared.frontmostApplication else {
-            debugPrint("❌ フロントアプリの取得に失敗しました")
+            debugPrint("❌ Failed to get frontmost application")
             return
         }
         
-        // Accessibility APIでウィンドウを取得
+        // Get window via Accessibility API
         let appRef = AXUIElementCreateApplication(frontApp.processIdentifier)
         var windowRef: AnyObject?
         let result = AXUIElementCopyAttributeValue(appRef, kAXFocusedWindowAttribute as CFString, &windowRef)
         
         guard result == .success, let window = windowRef else {
-            debugPrint("❌ フォーカスされたウィンドウの取得に失敗しました")
+            debugPrint("❌ Failed to get focused window")
             return
         }
         
-        // 現在の位置を取得
+        // Get current position
         var positionRef: AnyObject?
         AXUIElementCopyAttributeValue(window as! AXUIElement, kAXPositionAttribute as CFString, &positionRef)
         
         guard let positionValue = positionRef else {
-            debugPrint("❌ ウィンドウの位置の取得に失敗しました")
+            debugPrint("❌ Failed to get window position")
             return
         }
         
@@ -620,42 +630,42 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             newPosition.x += CGFloat(pixels)
         }
         
-        // 位置を更新
+        // Update position
         if let newPositionValue = AXValueCreate(.cgPoint, &newPosition) {
             let setResult = AXUIElementSetAttributeValue(window as! AXUIElement, kAXPositionAttribute as CFString, newPositionValue)
             if setResult == .success {
-                debugPrint("✅ ウィンドウを (\(Int(newPosition.x)), \(Int(newPosition.y))) に移動")
+                debugPrint("✅ Window moved to (\(Int(newPosition.x)), \(Int(newPosition.y)))")
             } else {
-                debugPrint("❌ ウィンドウの移動に失敗: \(setResult.rawValue)")
+                debugPrint("❌ Failed to move window: \(setResult.rawValue)")
             }
         }
     }
     
     func moveWindow(direction: Direction) {
-        debugPrint("=== \(direction == .next ? "次" : "前")の画面への移動を開始 ===")
+        debugPrint("=== Starting move to \(direction == .next ? "next" : "previous") screen ===")
         
-        // フロントのアプリケーションを取得
+        // Get frontmost application
         guard let frontApp = NSWorkspace.shared.frontmostApplication,
               let appName = frontApp.localizedName else {
-            debugPrint("❌ フロントアプリの取得に失敗しました")
+            debugPrint("❌ Failed to get frontmost application")
             return
         }
         
-        debugPrint("フロントアプリ: \(DebugLogger.shared.maskAppName(appName))")
+        debugPrint("Frontmost app: \(DebugLogger.shared.maskAppName(appName))")
         
-        // Accessibility APIでウィンドウを取得
+        // Get window via Accessibility API
         let appRef = AXUIElementCreateApplication(frontApp.processIdentifier)
         var windowRef: AnyObject?
         let result = AXUIElementCopyAttributeValue(appRef, kAXFocusedWindowAttribute as CFString, &windowRef)
         
         guard result == .success, let window = windowRef else {
-            debugPrint("❌ フォーカスされたウィンドウの取得に失敗しました")
+            debugPrint("❌ Failed to get focused window")
             return
         }
         
-        debugPrint("✅ フォーカスされたウィンドウを取得しました")
+        debugPrint("✅ Got focused window")
         
-        // 現在の位置とサイズを取得
+        // Get current position and size
         var positionRef: AnyObject?
         var sizeRef: AnyObject?
         
@@ -663,7 +673,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         AXUIElementCopyAttributeValue(window as! AXUIElement, kAXSizeAttribute as CFString, &sizeRef)
         
         guard let positionValue = positionRef, let sizeValue = sizeRef else {
-            debugPrint("❌ ウィンドウの位置・サイズの取得に失敗しました")
+            debugPrint("❌ Failed to get window position/size")
             return
         }
         
@@ -672,14 +682,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         AXValueGetValue(positionValue as! AXValue, .cgPoint, &position)
         AXValueGetValue(sizeValue as! AXValue, .cgSize, &size)
         
-        debugPrint("現在のウィンドウ位置: \(position), サイズ: \(size)")
+        debugPrint("Current window position: \(position), size: \(size)")
         
-        // 利用可能な画面を取得
+        // Get available screens
         let screens = NSScreen.screens
-        debugPrint("利用可能な画面数: \(screens.count)")
+        debugPrint("Available screens: \(screens.count)")
         
         guard screens.count > 1 else {
-            debugPrint("❌ 複数の画面が接続されていません")
+            debugPrint("❌ Multiple screens not connected")
             return
         }
         
@@ -693,7 +703,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             }
         }
         
-        debugPrint("現在の画面インデックス: \(currentScreenIndex)")
+        debugPrint("Current screen index: \(currentScreenIndex)")
         
         // 次/前の画面のインデックスを計算
         let nextScreenIndex: Int
@@ -704,7 +714,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             nextScreenIndex = (currentScreenIndex - 1 + screens.count) % screens.count
         }
         
-        debugPrint("次の画面インデックス: \(nextScreenIndex)")
+        debugPrint("Target screen index: \(nextScreenIndex)")
         
         let currentScreen = screens[currentScreenIndex]
         let nextScreen = screens[nextScreenIndex]
@@ -717,16 +727,16 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let newY = nextScreen.frame.origin.y + relativeY
         var newPosition = CGPoint(x: newX, y: newY)
         
-        debugPrint("新しい位置: \(newPosition)")
+        debugPrint("New position: \(newPosition)")
         
         // ウィンドウを移動
         if let positionValue = AXValueCreate(.cgPoint, &newPosition) {
             let setResult = AXUIElementSetAttributeValue(window as! AXUIElement, kAXPositionAttribute as CFString, positionValue)
             
             if setResult == .success {
-                debugPrint("✅ ウィンドウの移動に成功しました")
+                debugPrint("✅ Window moved successfully")
             } else {
-                debugPrint("❌ ウィンドウの移動に失敗しました: \(setResult.rawValue)")
+                debugPrint("❌ Failed to move window: \(setResult.rawValue)")
             }
         }
     }
@@ -739,7 +749,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             name: NSApplication.didChangeScreenParametersNotification,
             object: nil
         )
-        debugPrint("✅ ディスプレイ変更の監視を開始しました")
+        debugPrint("✅ Display change monitoring started")
     }
     
     /// 監視停止/再開の通知を設定
@@ -762,12 +772,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     /// ディスプレイ構成が変更されたときの処理
     @objc private func displayConfigurationChanged() {
         let screenCount = NSScreen.screens.count
-        debugPrint("🖥️ ディスプレイ構成が変更されました")
-        debugPrint("現在の画面数: \(screenCount)")
+        debugPrint("🖥️ Display configuration changed")
+        debugPrint("Current screen count: \(screenCount)")
         
         // 監視が無効化されている場合
         if !isDisplayMonitoringEnabled {
-            // イベントを記録し続ける（これが重要！）
+            // イベントを記録し続ける(これが重要！)
             lastDisplayChangeTime = Date()
             
             // タイマーがまだ動いていなければ開始
@@ -809,11 +819,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             isDisplayMonitoringEnabled = true
             eventOccurredAfterStabilization = false
             
-            debugPrint("✅ ディスプレイが安定したと判断（最後のイベントから\(String(format: "%.1f", elapsed))秒経過）")
-            debugPrint("▶️ ディスプレイ安定化により監視を再開します")
-            debugPrint("⏳ 次のディスプレイ変更イベントを待機（最大3秒）")
+            debugPrint("✅ Display stabilized (\(String(format: "%.1f", elapsed))s since last event)")
+            debugPrint("▶️ Resuming monitoring after display stabilization")
+            debugPrint("⏳ Waiting for next display event (max 3s)")
             
-            // フォールバック設定（3秒後）
+            // フォールバック設定(3秒後)
             let fallback = DispatchWorkItem { [weak self] in
                 self?.fallbackRestoration()
             }
@@ -826,11 +836,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private func fallbackRestoration() {
         if !eventOccurredAfterStabilization {
             // イベントが来なかった → 手動トリガー
-            debugPrint("⚠️ ディスプレイイベントが発生しなかったため、手動で復元をトリガーします")
+            debugPrint("⚠️ No display event occurred, triggering restore manually")
             triggerRestoration()
         } else {
             // イベントが来た → スキップ
-            debugPrint("✅ ディスプレイイベントが発生したため、フォールバックはスキップします")
+            debugPrint("✅ Display event occurred, skipping fallback")
         }
     }
     
@@ -847,7 +857,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let settings = WindowTimingSettings.shared
         let totalDelay = settings.windowRestoreDelay
         
-        debugPrint("復元まで \(String(format: "%.1f", totalDelay))秒待機") // 秒数の表示スタイル調整
+        debugPrint("Waiting \(String(format: "%.1f", totalDelay))s before restore") 
         
         let workItem = DispatchWorkItem { [weak self] in
             guard let self = self else { return }
@@ -861,7 +871,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             } else if NSScreen.screens.count >= 2 && self.restoreRetryCount < self.maxRestoreRetries {
                 // 復元失敗でリトライ可能な場合
                 self.restoreRetryCount += 1
-                debugPrint("🔄 復元リトライ予約（\(self.restoreRetryCount)/\(self.maxRestoreRetries)）: \(String(format: "%.1f", self.restoreRetryDelay))秒後") // 表示スタイル調整
+                debugPrint("🔄 Scheduling restore retry (\(self.restoreRetryCount)/\(self.maxRestoreRetries)): in \(String(format: "%.1f", self.restoreRetryDelay))s") 
                 
                 // リトライをスケジュール
                 DispatchQueue.main.asyncAfter(deadline: .now() + self.restoreRetryDelay) { [weak self] in
@@ -869,7 +879,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 }
             } else {
                 self.restoreRetryCount = 0
-                debugPrint("⏭️ スナップショット予約をスキップ（復元数: \(restoredCount), 画面数: \(NSScreen.screens.count)）")
+                debugPrint("⏭️ Skipping snapshot scheduling (restored: \(restoredCount), screens: \(NSScreen.screens.count))")
             }
         }
         
@@ -885,12 +895,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         stabilizationCheckTimer = nil
         fallbackTimer?.cancel()
         eventOccurredAfterStabilization = false
-        debugPrint("⏸️ ディスプレイ監視を一時停止しました")
+        debugPrint("⏸️ Display monitoring paused")
     }
     
     /// 監視を再開
     @objc private func resumeMonitoring() {
-        debugPrint("⏱️ ディスプレイ変更の安定化を待機中...")
+        debugPrint("⏱️ Waiting for display stabilization...")
     }
     
     /// ディスプレイ識別子を取得
@@ -913,15 +923,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         snapshotTimer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] _ in
             self?.takeWindowSnapshot()
         }
-        debugPrint("✅ ディスプレイ記憶用の定期監視を開始しました（\(Int(interval))秒間隔）")
+        debugPrint("✅ Periodic monitoring started (\(Int(interval))s interval)")
     }
     
-    /// 現在のウィンドウ配置のスナップショットを取得（自動復元用）
+    /// 現在のウィンドウ配置のスナップショットを取得(自動復元用)
     private func takeWindowSnapshot() {
         let screens = NSScreen.screens
         
         // ディスプレイ数の確認 - 2画面以上の時のみスナップショットを更新
-        // 1画面の時は既存データを保持（外部ディスプレイ切断時にデータを失わないため）
+        // 1画面の時は既存データを保持(外部ディスプレイ切断時にデータを失わないため)
         guard screens.count >= 2 else {
             return
         }
@@ -931,7 +941,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
         
-        // 外部ディスプレイのデータを一時保存（バックアップ）
+        // 外部ディスプレイのデータを一時保存(バックアップ)
         let mainScreenID = getDisplayIdentifier(for: screens[0])
         var externalDisplayBackup: [String: [String: WindowMatchInfo]] = [:]
         for (displayID, windows) in windowPositions {
@@ -947,7 +957,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             windowPositions[displayID] = [:]
         }
         
-        // 全ウィンドウを記録（WindowMatchInfo形式）
+        // 全ウィンドウを記録(WindowMatchInfo形式)
         var windowCountPerDisplay: [String: Int] = [:]
         for window in windowList {
             guard let layer = window[kCGWindowLayer as String] as? Int, layer == 0,
@@ -964,10 +974,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 height: boundsDict["Height"] ?? 0
             )
             
-            // ウィンドウタイトルを取得（存在しない場合はnil）
+            // ウィンドウタイトルを取得(存在しない場合はnil)
             let windowTitle = window[kCGWindowName as String] as? String
             
-            // WindowMatchInfoを生成（ハッシュ化）
+            // WindowMatchInfoを生成(ハッシュ化)
             let matchInfo = WindowMatchInfo(
                 appName: ownerName,
                 title: windowTitle,
@@ -975,7 +985,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 frame: frame
             )
             
-            // ユニークキー（ハッシュベース + CGWindowID）
+            // ユニークキー(ハッシュベース + CGWindowID)
             let windowKey = "\(matchInfo.appNameHash)_\(cgWindowID)"
             
             // このウィンドウがどの画面にあるか判定
@@ -998,18 +1008,18 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             // 現在のデータがなければバックアップから復元
             if windowPositions[displayID] != nil {
                 windowPositions[displayID] = backupWindows
-                verbosePrint("🔄 外部ディスプレイ \(displayID) のバックアップを復元: \(backupWindows.count)個")
+                verbosePrint("🔄 Restoring backup for external display \(displayID): \(backupWindows.count) windows")
             }
         }
     }
     
     /// 手動スナップショットを保存
     @objc func saveManualSnapshot() {
-        debugPrint("📸 手動スナップショット保存を開始（スロット\(currentSlotIndex)）")
+        debugPrint("📸 Starting manual snapshot save (slot \(currentSlotIndex))")
         
         let options = CGWindowListOption(arrayLiteral: .excludeDesktopElements, .optionOnScreenOnly)
         guard let windowList = CGWindowListCopyWindowInfo(options, kCGNullWindowID) as? [[String: Any]] else {
-            debugPrint("  ❌ ウィンドウリストの取得に失敗")
+            debugPrint("  ❌ Failed to get window list")
             return
         }
         
@@ -1040,10 +1050,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 height: boundsDict["Height"] ?? 0
             )
             
-            // ウィンドウタイトルを取得（存在しない場合はnil）
+            // ウィンドウタイトルを取得(存在しない場合はnil)
             let windowTitle = window[kCGWindowName as String] as? String
             
-            // WindowMatchInfoを生成（ハッシュ化）
+            // WindowMatchInfoを生成(ハッシュ化)
             let matchInfo = WindowMatchInfo(
                 appName: ownerName,
                 title: windowTitle,
@@ -1051,7 +1061,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 frame: frame
             )
             
-            // ユニークキー（ハッシュベース）を生成
+            // ユニークキー(ハッシュベース)を生成
             let windowKey = "\(matchInfo.appNameHash)_\(cgWindowID)"
             
             // このウィンドウがどの画面にあるか判定
@@ -1060,10 +1070,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                     let displayID = getDisplayIdentifier(for: screen)
                     snapshot[displayID]?[windowKey] = matchInfo
                     savedCount += 1
-                    // タイトル情報を含めてログ出力（詳細モード）
+                    // タイトル情報を含めてログ出力(詳細モード)
                     let titleInfo = windowTitle != nil ? "title:✓" : "title:✗"
                     let sizeInfo = "\(Int(frame.width))x\(Int(frame.height))"
-                    verbosePrint("  保存: \(DebugLogger.shared.maskAppName(ownerName)) @ (\(Int(frame.origin.x)), \(Int(frame.origin.y))) [\(sizeInfo)] [\(titleInfo)]")
+                    verbosePrint("  Saved: \(DebugLogger.shared.maskAppName(ownerName)) @ (\(Int(frame.origin.x)), \(Int(frame.origin.y))) [\(sizeInfo)] [\(titleInfo)]")
                     break
                 }
             }
@@ -1074,12 +1084,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // 永続化
         ManualSnapshotStorage.shared.save(manualSnapshots)
         
-        debugPrint("📸 スナップショット保存完了: \(savedCount)個のウィンドウ")
+        debugPrint("📸 Snapshot saved: \(savedCount) windows")
         
         // 通知
         sendNotification(
             title: "スナップショット保存",
-            body: "\(savedCount)個のウィンドウ位置を保存しました"
+            body: "\(savedCount) windows位置を保存しました"
         )
         
         // メニューを更新
@@ -1088,38 +1098,38 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     
     /// 手動スナップショットを復元
     @objc func restoreManualSnapshot() {
-        debugPrint("📥 手動スナップショット復元を開始（スロット\(currentSlotIndex)）")
+        debugPrint("📥 Starting manual snapshot restore (slot \(currentSlotIndex))")
         
         let snapshot = manualSnapshots[currentSlotIndex]
         
         if snapshot.isEmpty || snapshot.values.allSatisfy({ $0.isEmpty }) {
-            debugPrint("  ⚠️ スナップショットが空です。先に保存してください。")
+            debugPrint("  ⚠️ Snapshot is empty. Please save first.")
             return
         }
         
         let options = CGWindowListOption(arrayLiteral: .excludeDesktopElements, .optionOnScreenOnly)
         guard let windowList = CGWindowListCopyWindowInfo(options, kCGNullWindowID) as? [[String: Any]] else {
-            debugPrint("  ❌ ウィンドウリストの取得に失敗")
+            debugPrint("  ❌ Failed to get window list")
             return
         }
         
         var restoredCount = 0
-        var usedWindowIDs = Set<CGWindowID>()  // 既にマッチしたウィンドウを追跡
+        var usedWindowIDs = Set<CGWindowID>()  // Track matched windows
         
-        // 各ディスプレイの保存データを処理
+        // Process saved data for each display
         for (displayID, savedWindows) in snapshot {
-            verbosePrint("  📍 ディスプレイ \(displayID): \(savedWindows.count)個の保存情報")
+            verbosePrint("  📍 Display \(displayID): \(savedWindows.count) saved windows")
             for (windowKey, savedInfo) in savedWindows {
                 let targetPos = "(\(Int(savedInfo.frame.origin.x)), \(Int(savedInfo.frame.origin.y)))"
                 let targetSize = "\(Int(savedInfo.size.width))x\(Int(savedInfo.size.height))"
                 let hasTitle = savedInfo.titleHash != nil ? "title:✓" : "title:✗"
-                verbosePrint("    → 目標: \(targetPos) [\(targetSize)] [\(hasTitle)]")
+                verbosePrint("    → Target: \(targetPos) [\(targetSize)] [\(hasTitle)]")
                 
-                // windowKeyからCGWindowIDを抽出（形式: appNameHash_CGWindowID）
+                // windowKeyからCGWindowIDを抽出(形式: appNameHash_CGWindowID)
                 let components = windowKey.split(separator: "_")
                 let savedCGWindowID: CGWindowID? = components.count >= 2 ? CGWindowID(components.last!) : nil
                 
-                // マッチング: 優先順位順に試行（CGWindowID優先）
+                // マッチング: 優先順位順に試行(CGWindowID優先)
                 let matchedWindow = findMatchingWindow(
                     for: savedInfo,
                     in: windowList,
@@ -1128,7 +1138,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 )
                 
                 guard let (matchedWindowInfo, ownerPID, ownerName, cgWindowID) = matchedWindow else {
-                    verbosePrint("      ⚠️ マッチするウィンドウなし")
+                    verbosePrint("      ⚠️ No matching window found")
                     continue
                 }
                 
@@ -1174,9 +1184,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                                         if posResult == .success {
                                             restoredCount += 1
                                             let sizeInfo = sizeRestored ? "+サイズ" : ""
-                                            debugPrint("    ✅ \(DebugLogger.shared.maskAppName(ownerName)) を (\(Int(savedFrame.origin.x)), \(Int(savedFrame.origin.y))) に復元\(sizeInfo)")
+                                            debugPrint("    ✅ \(DebugLogger.shared.maskAppName(ownerName)) restored to (\(Int(savedFrame.origin.x)), \(Int(savedFrame.origin.y)))\(sizeInfo)")
                                         } else {
-                                            debugPrint("    ❌ \(DebugLogger.shared.maskAppName(ownerName)) の移動失敗: \(posResult.rawValue)")
+                                            debugPrint("    ❌ \(DebugLogger.shared.maskAppName(ownerName)) move failed: \(posResult.rawValue)")
                                         }
                                     }
                                     break
@@ -1188,13 +1198,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             }
         }
         
-        debugPrint("📥 スナップショット復元完了: \(restoredCount)個のウィンドウを移動")
+        debugPrint("📥 Snapshot restore complete: \(restoredCount) windows moved")
         
         // 通知
         if restoredCount > 0 {
             sendNotification(
                 title: "スナップショット復元",
-                body: "\(restoredCount)個のウィンドウ位置を復元しました"
+                body: "\(restoredCount) windows位置を復元しました"
             )
         } else {
             sendNotification(
@@ -1213,7 +1223,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         preferredCGWindowID: CGWindowID? = nil
     ) -> (frame: CGRect, pid: Int32, appName: String, windowID: CGWindowID)? {
         
-        var titleMatches: [(CGRect, Int32, String, CGWindowID, String)] = []  // 5番目はタイトル（デバッグ用）
+        var titleMatches: [(CGRect, Int32, String, CGWindowID, String)] = []  // 5番目はタイトル(デバッグ用)
         var sizeMatches: [(CGRect, Int32, String, CGWindowID)] = []
         var appOnlyMatches: [(CGRect, Int32, String, CGWindowID)] = []
         
@@ -1240,19 +1250,19 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 height: boundsDict["Height"] ?? 0
             )
             
-            // appNameHashを先に計算（CGWindowIDマッチでも使用）
+            // appNameHashを先に計算(CGWindowIDマッチでも使用)
             let currentAppNameHash = WindowMatchInfo.hash(ownerName)
             
-            // CGWindowID完全一致（最優先 - セッション中は確実にマッチ）
+            // CGWindowID完全一致(最優先 - セッション中は確実にマッチ)
             // appNameHashも確認して異なるアプリのウィンドウを誤マッチしないようにする
             if let preferredID = preferredCGWindowID, cgWindowID == preferredID {
                 if currentAppNameHash == savedInfo.appNameHash {
-                    verbosePrint("    🆔 CGWindowID完全一致: \(cgWindowID)")
+                    verbosePrint("    🆔 CGWindowID exact match: \(cgWindowID)")
                     return (currentFrame, ownerPID, ownerName, cgWindowID)
                 }
             }
             
-            // appNameHashをチェック（フォールバックマッチング用）
+            // appNameHashをチェック(フォールバックマッチング用)
             guard currentAppNameHash == savedInfo.appNameHash else {
                 continue
             }
@@ -1276,11 +1286,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 continue
             }
             
-            // appName単体マッチ（最後のフォールバック）
+            // appName単体マッチ(最後のフォールバック)
             appOnlyMatches.append(matchData)
         }
         
-        // 位置近接でソート（保存時の位置に最も近いウィンドウを優先）
+        // 位置近接でソート(保存時の位置に最も近いウィンドウを優先)
         let savedOrigin = savedInfo.frame.origin
         
         func distanceToSaved(_ frame: CGRect) -> CGFloat {
@@ -1299,22 +1309,22 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             appOnlyMatches.sort { distanceToSaved($0.0) < distanceToSaved($1.0) }
         }
         
-        // 優先順位順に返す（詳細ログ付き）
+        // 優先順位順に返す(詳細ログ付き)
         if let match = titleMatches.first {
             let shortTitle = String(match.4.prefix(30))
-            verbosePrint("    🎯 タイトルマッチ: \"\(shortTitle)...\" (候補\(titleMatches.count)件)")
+            verbosePrint("    🎯 Title match: \"\(shortTitle)...\" (candidates:\(titleMatches.count))")
             return (match.0, match.1, match.2, match.3)
         }
         if let match = sizeMatches.first {
             let savedSize = "\(Int(savedInfo.size.width))x\(Int(savedInfo.size.height))"
             let titleStatus = savedHasTitle ? "保存時title:✓" : "保存時title:✗"
             let dist = Int(distanceToSaved(match.0))
-            verbosePrint("    📐 サイズマッチ: \(savedSize) (候補\(sizeMatches.count)件, 距離\(dist)px) [\(titleStatus)]")
+            verbosePrint("    📐 Size match: \(savedSize) (candidates:\(sizeMatches.count),  dist:\(dist)px) [\(titleStatus)]")
             return match
         }
         if let match = appOnlyMatches.first {
             let dist = Int(distanceToSaved(match.0))
-            verbosePrint("    📱 アプリ名マッチ (候補\(appOnlyMatches.count)件, 距離\(dist)px)")
+            verbosePrint("    📱 App name match (candidates:\(appOnlyMatches.count),  dist:\(dist)px)")
             return match
         }
         
@@ -1324,11 +1334,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     /// ウィンドウを復元し、復元したウィンドウ数を返す
     @discardableResult // 関数の戻り値がなくても警告を出さない
     private func restoreWindowsIfNeeded() -> Int {
-        debugPrint("🔄 ウィンドウ復元処理を開始...")
+        debugPrint("🔄 Starting window restore process...")
         
         let currentScreens = NSScreen.screens
         guard currentScreens.count >= 2 else {
-            debugPrint("  画面が1つしかないため、復元をスキップします")
+            debugPrint("  Only one screen, skipping restore")
             return 0
         }
         
@@ -1341,26 +1351,26 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let externalScreenIDs = savedScreenIDs.intersection(currentScreenIDs).subtracting([mainScreenID])
         
         if externalScreenIDs.isEmpty {
-            debugPrint("  復元対象の外部ディスプレイがありません")
+            debugPrint("  No external display to restore")
             return 0
         }
         
-        debugPrint("  復元対象ディスプレイ: \(externalScreenIDs.joined(separator: ", "))")
+        debugPrint("  Target displays: \(externalScreenIDs.joined(separator: ", "))")
         
         // 現在の全ウィンドウを取得
         let options = CGWindowListOption(arrayLiteral: .excludeDesktopElements, .optionOnScreenOnly)
         guard let windowList = CGWindowListCopyWindowInfo(options, kCGNullWindowID) as? [[String: Any]] else {
-            debugPrint("  ❌ ウィンドウリストの取得に失敗")
+            debugPrint("  ❌ Failed to get window list")
             return 0
         }
         
         // デバッグ: 現在のウィンドウリストを表示
-        verbosePrint("  現在のウィンドウ:")
+        verbosePrint("  Current windows:")
         for window in windowList {
             if let ownerName = window[kCGWindowOwnerName as String] as? String,
                let cgWindowID = window[kCGWindowNumber as String] as? CGWindowID,
                let layer = window[kCGWindowLayer as String] as? Int, layer == 0 {
-                verbosePrint("    現在: \(DebugLogger.shared.maskAppName(ownerName)) (ID:\(cgWindowID))")
+                verbosePrint("    Current: \(DebugLogger.shared.maskAppName(ownerName)) (ID:\(cgWindowID))")
             }
         }
         
@@ -1373,32 +1383,32 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 continue
             }
             
-            verbosePrint("  📍 画面 \(externalScreenID) に \(savedWindows.count)個の保存情報")
+            verbosePrint("  📍 Screen \(externalScreenID) : \(savedWindows.count) saved windows")
             
             // 保存されたウィンドウを復元
             for (windowKey, savedInfo) in savedWindows {
                 let targetPos = "(\(Int(savedInfo.frame.origin.x)), \(Int(savedInfo.frame.origin.y)))"
-                verbosePrint("    → 目標: \(targetPos)")
+                verbosePrint("    → Target: \(targetPos)")
                 
-                // windowKeyからCGWindowIDを抽出（形式: appNameHash_CGWindowID）
+                // windowKeyからCGWindowIDを抽出(形式: appNameHash_CGWindowID)
                 let components = windowKey.split(separator: "_")
                 let savedCGWindowID: CGWindowID? = components.count >= 2 ? CGWindowID(components.last!) : nil
                 
-                // findMatchingWindow()でマッチングを行う（CGWindowID優先）
+                // findMatchingWindow()でマッチングを行う(CGWindowID優先)
                 guard let matchedWindow = findMatchingWindow(
                     for: savedInfo,
                     in: windowList,
                     excluding: usedWindowIDs,
                     preferredCGWindowID: savedCGWindowID
                 ) else {
-                    verbosePrint("      ⚠️ マッチするウィンドウなし")
+                    verbosePrint("      ⚠️ No matching window found")
                     continue
                 }
                 
                 let (currentFrame, ownerPID, ownerName, cgWindowID) = matchedWindow
                 
                 // CGWindowIDで完全一致した場合は、位置に関係なく使用済みにマーク
-                // （同じウィンドウが他のエントリで再度マッチするのを防ぐ）
+                // (同じウィンドウが他のエントリで再度マッチするのを防ぐ)
                 let isCGWindowIDMatch = savedCGWindowID != nil && savedCGWindowID == cgWindowID
                 if isCGWindowIDMatch {
                     usedWindowIDs.insert(cgWindowID)
@@ -1411,14 +1421,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 if !isOnMainScreen {
                     // 既に外部ディスプレイにある場合は正常なのでログレベルを変更
                     if isCGWindowIDMatch {
-                        verbosePrint("      ✓ 既に外部ディスプレイにある - X座標: \(Int(currentFrame.origin.x))")
+                        verbosePrint("      ✓ Already on external display - X: \(Int(currentFrame.origin.x))")
                     } else {
-                        verbosePrint("      ⚠️ メイン画面にない(スキップ) - X座標: \(Int(currentFrame.origin.x))")
+                        verbosePrint("      ⚠️ Not on main screen (skip) - X: \(Int(currentFrame.origin.x))")
                     }
                     continue
                 }
                 
-                verbosePrint("      ✓ メイン画面にある - X座標: \(Int(currentFrame.origin.x))")
+                verbosePrint("      ✓ On main screen - X: \(Int(currentFrame.origin.x))")
                 
                 // サイズ/タイトルマッチの場合はここで使用済みに追加
                 if !isCGWindowIDMatch {
@@ -1460,9 +1470,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                                         if posResult == .success {
                                             restoredCount += 1
                                             let sizeInfo = sizeRestored ? "+サイズ" : ""
-                                            debugPrint("    ✅ \(DebugLogger.shared.maskAppName(ownerName)) を (\(Int(savedFrame.origin.x)), \(Int(savedFrame.origin.y))) に復元\(sizeInfo)")
+                                            debugPrint("    ✅ \(DebugLogger.shared.maskAppName(ownerName)) restored to (\(Int(savedFrame.origin.x)), \(Int(savedFrame.origin.y)))\(sizeInfo)")
                                         } else {
-                                            debugPrint("    ❌ \(DebugLogger.shared.maskAppName(ownerName)) の移動失敗: \(posResult.rawValue)")
+                                            debugPrint("    ❌ \(DebugLogger.shared.maskAppName(ownerName)) move failed: \(posResult.rawValue)")
                                         }
                                     }
                                     matchFound = true
@@ -1472,13 +1482,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                         }
                     }
                     if !matchFound {
-                        verbosePrint("      ⚠️ AXUIElement位置マッチング失敗 - CGWindow位置: (\(Int(currentFrame.origin.x)), \(Int(currentFrame.origin.y)))")
+                        verbosePrint("      ⚠️ AXUIElement position match failed - CGWindow pos: (\(Int(currentFrame.origin.x)), \(Int(currentFrame.origin.y)))")
                     }
                 }
             }
         }
         
-        debugPrint("✅ 合計 \(restoredCount)個のウィンドウを復元しました\n")
+        debugPrint("✅ Total \(restoredCount) windows restored\n")
         return restoredCount
     }
     
@@ -1503,10 +1513,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             }
             
             if totalWindows > 0 {
-                debugPrint("💾 保存済みスナップショットを読み込みました: \(totalWindows)個のウィンドウ")
+                debugPrint("💾 Loaded saved snapshot: \(totalWindows) windows")
             }
         } else {
-            debugPrint("💾 保存済みスナップショットはありません")
+            debugPrint("💾 No saved snapshot found")
         }
     }
     
@@ -1547,13 +1557,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         snapshotTimer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] _ in
             self?.takeWindowSnapshot()
         }
-        debugPrint("🔄 ディスプレイ記憶用の監視間隔を変更しました（\(Int(interval))秒間隔）")
+        debugPrint("🔄 Display memory interval changed(\(Int(interval))s interval)")
     }
     
     /// 手動スナップショットをクリア
     private func clearManualSnapshots() {
         manualSnapshots = Array(repeating: [:], count: 5)
-        debugPrint("🗑️ メモリ上のスナップショットをクリアしました")
+        debugPrint("🗑️ In-memory snapshot cleared")
     }
     
     /// 初回自動スナップショットタイマーを開始
@@ -1561,15 +1571,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let settings = SnapshotSettings.shared
         let delaySeconds = settings.initialDelaySeconds
         
-        debugPrint("⏱️ 初回自動スナップショットタイマーを開始: \(String(format: "%.1f", delaySeconds/60))分後")
+        debugPrint("⏱️ Initial auto-snapshot timer started: \(String(format: "%.1f", delaySeconds/60))min")
         
         // 既存のタイマーをキャンセル
         initialSnapshotTimer?.invalidate()
         initialSnapshotTimer = nil
         
-        // Timer を .common モードで RunLoop に追加（UI操作中も動作）
+        // Timer を .common モードで RunLoop に追加(UI操作中も動作)
         let timer = Timer(timeInterval: delaySeconds, repeats: false) { [weak self] _ in
-            debugPrint("⏱️ 初回自動スナップショットタイマーが発火しました")
+            debugPrint("⏱️ Initial auto-snapshot timer fired")
             self?.performAutoSnapshot(reason: "初回自動")
             self?.hasInitialSnapshotBeenTaken = true
             
@@ -1588,28 +1598,28 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let settings = SnapshotSettings.shared
         
         guard settings.enablePeriodicSnapshot else {
-            debugPrint("⏱️ 定期スナップショットは無効です")
+            debugPrint("⏱️ Periodic snapshot is disabled")
             return
         }
         
         let intervalSeconds = settings.periodicIntervalSeconds
         
-        debugPrint("⏱️ 定期スナップショットタイマーを開始: \(String(format: "%.0f", intervalSeconds/60))分間隔")
+        debugPrint("⏱️ Periodic snapshot timer started: \(String(format: "%.0f", intervalSeconds/60))min interval")
         
         // 既存のタイマーをキャンセル
         periodicSnapshotTimer?.invalidate()
         periodicSnapshotTimer = nil
         
-        // Timer を .common モードで RunLoop に追加（UI操作中も動作）
+        // Timer を .common モードで RunLoop に追加(UI操作中も動作)
         let timer = Timer(timeInterval: intervalSeconds, repeats: true) { [weak self] _ in
-            debugPrint("⏱️ 定期スナップショットタイマーが発火しました")
+            debugPrint("⏱️ Periodic snapshot timer fired")
             self?.performAutoSnapshot(reason: "定期自動")
         }
         RunLoop.main.add(timer, forMode: .common)
         periodicSnapshotTimer = timer
     }
     
-    /// 定期スナップショットタイマーを再設定（設定変更時）
+    /// 定期スナップショットタイマーを再設定(設定変更時)
     private func restartPeriodicSnapshotTimerIfNeeded() {
         let settings = SnapshotSettings.shared
         
@@ -1619,24 +1629,24 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         if settings.enablePeriodicSnapshot && hasInitialSnapshotBeenTaken {
             startPeriodicSnapshotTimer()
         } else if !settings.enablePeriodicSnapshot {
-            debugPrint("⏱️ 定期スナップショットを停止しました")
+            debugPrint("⏱️ Periodic snapshot stopped")
         }
     }
     
     /// 自動スナップショットを実行
     private func performAutoSnapshot(reason: String) {
-        debugPrint("📸 \(reason)スナップショットを取得中...")
+        debugPrint("📸 \(reason)snapshot in progress...")
         
         // ディスプレイ数の確認
         let screenCount = NSScreen.screens.count
         if screenCount < 2 {
-            debugPrint("🛡️ ディスプレイ保護: 画面数が\(screenCount)のため自動スナップショットをスキップ")
+            debugPrint("🛡️ Display protection: screen count is\(screenCount), skipping auto-snapshot")
             return
         }
         
         let options = CGWindowListOption(arrayLiteral: .excludeDesktopElements, .optionOnScreenOnly)
         guard let windowList = CGWindowListCopyWindowInfo(options, kCGNullWindowID) as? [[String: Any]] else {
-            debugPrint("  ❌ ウィンドウリストの取得に失敗")
+            debugPrint("  ❌ Failed to get window list")
             return
         }
         
@@ -1667,10 +1677,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 height: boundsDict["Height"] ?? 0
             )
             
-            // ウィンドウタイトルを取得（存在しない場合はnil）
+            // ウィンドウタイトルを取得(存在しない場合はnil)
             let windowTitle = window[kCGWindowName as String] as? String
             
-            // WindowMatchInfoを生成（ハッシュ化）
+            // WindowMatchInfoを生成(ハッシュ化)
             let matchInfo = WindowMatchInfo(
                 appName: ownerName,
                 title: windowTitle,
@@ -1678,7 +1688,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 frame: frame
             )
             
-            // ユニークキー（ハッシュベース）を生成
+            // ユニークキー(ハッシュベース)を生成
             let windowKey = "\(matchInfo.appNameHash)_\(cgWindowID)"
             
             // このウィンドウがどの画面にあるか判定
@@ -1696,7 +1706,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let snapshotSettings = SnapshotSettings.shared
         if snapshotSettings.protectExistingSnapshot && ManualSnapshotStorage.shared.hasSnapshot {
             if savedCount < snapshotSettings.minimumWindowCount {
-                debugPrint("🛡️ 既存データ保護: ウィンドウ数が\(savedCount)個（最小\(snapshotSettings.minimumWindowCount)個）のため上書きをスキップ")
+                debugPrint("🛡️ Data protection: window count is\(savedCount) (min:\(snapshotSettings.minimumWindowCount)), skipping overwrite")
                 return
             }
         }
@@ -1706,9 +1716,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // 永続化
         ManualSnapshotStorage.shared.save(manualSnapshots)
         
-        debugPrint("📸 \(reason)スナップショット完了: \(savedCount)個のウィンドウ")
+        debugPrint("📸 \(reason)snapshot complete: \(savedCount) windows")
         
-        // 通知（自動スナップショットはサウンドのみ、システム通知は送らない）
+        // 通知(自動スナップショットはサウンドのみ、システム通知は送らない)
         if SnapshotSettings.shared.enableSound {
             NSSound(named: NSSound.Name(SnapshotSettings.shared.soundName))?.play()
         }
@@ -1724,15 +1734,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let settings = SnapshotSettings.shared
         let delaySeconds = settings.initialDelaySeconds
         
-        debugPrint("⏱️ ディスプレイ認識後スナップショット: \(String(format: "%.1f", delaySeconds/60))分後に予定")
+        debugPrint("⏱️ Post-display-connection snapshot: \(String(format: "%.1f", delaySeconds/60))min scheduled")
         
         // 既存の初回タイマーをキャンセルして新しく設定
         initialSnapshotTimer?.invalidate()
         initialSnapshotTimer = nil
         
-        // Timer を .common モードで RunLoop に追加（UI操作中も動作）
+        // Timer を .common モードで RunLoop に追加(UI操作中も動作)
         let timer = Timer(timeInterval: delaySeconds, repeats: false) { [weak self] _ in
-            debugPrint("⏱️ ディスプレイ認識後スナップショットタイマーが発火しました")
+            debugPrint("⏱️ Post-display-connection snapshot timer fired")
             self?.performAutoSnapshot(reason: "ディスプレイ認識後自動")
             self?.hasInitialSnapshotBeenTaken = true
             
@@ -1752,7 +1762,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // プライバシー保護モードの場合、終了時にスナップショットをクリア
         if SnapshotSettings.shared.disablePersistence {
             ManualSnapshotStorage.shared.clear()
-            debugPrint("🔒 アプリ終了時: プライバシー保護モードによりスナップショットを消去")
+            debugPrint("🔒 App terminating: Clearing snapshot (privacy mode)")
         }
     }
     
@@ -1792,13 +1802,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 }
 
-// debugPrint関数の実装
+// Implementation of debugPrint function
 func debugPrint(_ message: String) {
     print(message)
     DebugLogger.shared.addLog(message)
 }
 
-// 詳細ログ用（設定で有効時のみ出力）
+// 詳細ログ用(設定で有効時のみ出力)
 func verbosePrint(_ message: String) {
     guard SnapshotSettings.shared.verboseLogging else { return }
     print(message)

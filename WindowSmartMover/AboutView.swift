@@ -8,7 +8,7 @@
 import SwiftUI
 
 struct AboutView: View {
-    // Info.plistから情報を取得
+    // Get info from Info.plist
     private var appVersion: String {
         Bundle.main.infoDictionary?["CFBundleShortVersionString"] as? String ?? "1.0.0"
     }
@@ -27,13 +27,13 @@ struct AboutView: View {
     
     var body: some View {
         VStack(spacing: 16) {
-            // アイコン
+            // Icon
             Image(systemName: "rectangle.2.swap")
                 .font(.system(size: 50))
                 .foregroundColor(.blue)
                 .padding(.top, 20)
             
-            // アプリ名
+            // App name
             VStack(spacing: 4) {
                 Text("Tsubame")
                     .font(.title)
@@ -43,7 +43,7 @@ struct AboutView: View {
                     .foregroundColor(.secondary)
             }
             
-            // バージョン情報
+            // Version info
             HStack(spacing: 16) {
                 HStack(spacing: 4) {
                     Text("Version")
@@ -63,14 +63,14 @@ struct AboutView: View {
             
             Divider()
             
-            // ショートカット一覧
-            GroupBox(label: Text("ショートカット").font(.headline)) {
+            // Shortcuts
+            GroupBox(label: Text(NSLocalizedString("Shortcuts", comment: "")).font(.headline)) {
                 VStack(alignment: .leading, spacing: 6) {
                     let mod = HotKeySettings.shared.getModifierString()
                     
                     HStack {
-                        Text("画面間移動")
-                            .frame(width: 90, alignment: .leading)
+                        Text(NSLocalizedString("Move between screens", comment: ""))
+                            .frame(width: 130, alignment: .leading)
                             .font(.subheadline)
                         Text("\(mod)→ / \(mod)←")
                             .font(.system(.subheadline, design: .monospaced))
@@ -78,8 +78,8 @@ struct AboutView: View {
                     }
                     
                     HStack {
-                        Text("スナップショット")
-                            .frame(width: 90, alignment: .leading)
+                        Text(NSLocalizedString("Snapshot", comment: ""))
+                            .frame(width: 130, alignment: .leading)
                             .font(.subheadline)
                         Text("\(mod)↑ / \(mod)↓")
                             .font(.system(.subheadline, design: .monospaced))
@@ -87,8 +87,8 @@ struct AboutView: View {
                     }
                     
                     HStack {
-                        Text("位置微調整")
-                            .frame(width: 90, alignment: .leading)
+                        Text(NSLocalizedString("Position adjustment", comment: ""))
+                            .frame(width: 130, alignment: .leading)
                             .font(.subheadline)
                         Text("\(mod)W/A/S/D")
                             .font(.system(.subheadline, design: .monospaced))
@@ -98,11 +98,11 @@ struct AboutView: View {
                 .padding(.vertical, 4)
             }
             
-            // 情報
-            GroupBox(label: Text("情報").font(.headline)) {
+            // Information
+            GroupBox(label: Text(NSLocalizedString("Information", comment: "")).font(.headline)) {
                 VStack(alignment: .leading, spacing: 6) {
                     HStack {
-                        Text("開発者")
+                        Text(NSLocalizedString("Developer", comment: ""))
                             .frame(width: 70, alignment: .leading)
                             .font(.subheadline)
                         Text("Masahito Zembutsu")
@@ -111,7 +111,7 @@ struct AboutView: View {
                     }
                     
                     HStack {
-                        Text("ライセンス")
+                        Text(NSLocalizedString("License", comment: ""))
                             .frame(width: 70, alignment: .leading)
                             .font(.subheadline)
                         Text("MIT License")
@@ -132,12 +132,12 @@ struct AboutView: View {
             
             Spacer()
             
-            // 著作権情報
+            // Copyright
             Text("© 2025 @zembutsu")
                 .font(.caption)
                 .foregroundColor(.secondary)
             
-            // 閉じるボタン
+            // Close button
             Button("OK") {
                 dismiss()
             }
