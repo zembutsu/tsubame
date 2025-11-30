@@ -41,6 +41,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Old URLs automatically redirect to new location
   - Bundle Identifier unchanged (user settings preserved)
 
+### Security
+- **Salted hash for WindowMatchInfo** (#26)
+  - Added random salt to SHA256 hash function for privacy protection
+  - Previous implementation: `SHA256(appName)` - vulnerable to rainbow table attacks
+  - New implementation: `SHA256(salt + appName)` - resistant to reverse lookup
+  - Salt is generated once per installation using `SecRandomCopyBytes` (256-bit)
+  - Stored in UserDefaults (Keychain is overkill for local-only data)
+  - Common app names (Safari, Finder, Chrome) can no longer be identified from stored hashes
+
 ### Technical Details
 - Implemented NSLocalizedString for all 80+ UI strings
 - Created ja.lproj/Localizable.strings for Japanese translations
@@ -49,6 +58,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added `maskAppNamesInLog` property to `SnapshotSettings`
 - Added `maskAppName()` and `clearAppNameMapping()` to `DebugLogger`
 - Applied masking to all log outputs containing app names
+- Added `HashSaltManager` singleton class for salt generation and caching
+- Modified `WindowMatchInfo.hash()` to use salted input
+- Added `import Security` for `SecRandomCopyBytes`
+
+### Migration Notes
+- Existing snapshots will not match after upgrade (different hash values)
+- Simply save a new snapshot after upgrading - no manual intervention needed
 
 
 ## [1.2.7] - 2025-11-29

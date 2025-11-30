@@ -3,6 +3,7 @@ import Carbon
 import Combine
 import AppKit
 import CryptoKit
+import Security
 
 // MARK: - Window Matching Data Structure
 
@@ -58,16 +59,59 @@ class LanguageSettings: ObservableObject {
     }
 }
 
+/// Salt manager for privacy-protected hashing
+class HashSaltManager {
+    static let shared = HashSaltManager()
+    
+    private let saltKey = "WindowMatchInfoSalt"
+    private var cachedSalt: String?
+    
+    private init() {
+        // Load or generate salt on first access
+        _ = getSalt()
+    }
+    
+    /// Get salt (generate if not exists)
+    func getSalt() -> String {
+        if let cached = cachedSalt {
+            return cached
+        }
+        
+        if let stored = UserDefaults.standard.string(forKey: saltKey) {
+            cachedSalt = stored
+            return stored
+        }
+        
+        // Generate new random salt (32 bytes = 256 bits)
+        var bytes = [UInt8](repeating: 0, count: 32)
+        let status = SecRandomCopyBytes(kSecRandomDefault, bytes.count, &bytes)
+        
+        let newSalt: String
+        if status == errSecSuccess {
+            newSalt = bytes.map { String(format: "%02x", $0) }.joined()
+        } else {
+            // Fallback: UUID-based (less secure but functional)
+            newSalt = UUID().uuidString + UUID().uuidString
+        }
+        
+        UserDefaults.standard.set(newSalt, forKey: saltKey)
+        cachedSalt = newSalt
+        return newSalt
+    }
+}
+
 /// Window identification info (hashed for privacy protection)
 struct WindowMatchInfo: Codable, Equatable {
-    let appNameHash: String      // SHA256(appName)
-    let titleHash: String?       // SHA256(title) - for matching
+    let appNameHash: String      // SHA256(salt + appName)
+    let titleHash: String?       // SHA256(salt + title) - for matching
     let size: CGSize             // for fallback matching
     let frame: CGRect            // restore position
     
-    /// Generate SHA256 hash
+    /// Generate salted SHA256 hash
     static func hash(_ input: String) -> String {
-        let data = Data(input.utf8)
+        let salt = HashSaltManager.shared.getSalt()
+        let saltedInput = salt + input
+        let data = Data(saltedInput.utf8)
         let hash = SHA256.hash(data: data)
         return hash.compactMap { String(format: "%02x", $0) }.joined()
     }
