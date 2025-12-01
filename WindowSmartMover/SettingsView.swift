@@ -4,6 +4,7 @@ import Combine
 import AppKit
 import CryptoKit
 import Security
+import UserNotifications
 
 // MARK: - Window Matching Data Structure
 
@@ -506,7 +507,7 @@ class ManualSnapshotStorage {
         // Remove legacy format data if exists
         if defaults.data(forKey: legacyStorageKey) != nil {
             defaults.removeObject(forKey: legacyStorageKey)
-            print("🔄 Removed legacy snapshot data (v1.3.0 migration)")
+            debugPrint("🔄 Removed legacy snapshot data (v1.3.0 migration)")
         }
     }
     
@@ -514,31 +515,42 @@ class ManualSnapshotStorage {
     func save(_ snapshots: [[String: [String: WindowMatchInfo]]]) {
         // Skip if persistence is disabled
         if SnapshotSettings.shared.disablePersistence {
-            print("🔒 Persistence disabled: Snapshot not saved")
+            debugPrint("🔒 Persistence disabled: Snapshot not saved")
             return
         }
         
         // WindowMatchInfo is directly Codable compatible
-        if let data = try? JSONEncoder().encode(snapshots) {
+        do {
+            let data = try JSONEncoder().encode(snapshots)
             defaults.set(data, forKey: storageKey)
             defaults.set(Date().timeIntervalSince1970, forKey: timestampKey)
-            print("💾 Snapshot persisted (privacy-protected format)")
+            debugPrint("💾 Snapshot persisted (privacy-protected format)")
+        } catch {
+            debugPrint("❌ Failed to encode snapshot: \(error.localizedDescription)")
+            sendErrorNotification(
+                title: NSLocalizedString("Snapshot Save Failed", comment: "Error notification title"),
+                body: String(format: NSLocalizedString("Failed to save snapshot data: %@", comment: "Error notification body"), error.localizedDescription)
+            )
         }
     }
     
     /// Load snapshot (new format)
     func load() -> [[String: [String: WindowMatchInfo]]]? {
-        guard let data = defaults.data(forKey: storageKey),
-              let snapshots = try? JSONDecoder().decode([[String: [String: WindowMatchInfo]]].self, from: data) else {
+        guard let data = defaults.data(forKey: storageKey) else {
             return nil
         }
         
-        if let timestamp = defaults.object(forKey: timestampKey) as? Double {
-            let date = Date(timeIntervalSince1970: timestamp)
-            print("💾 Loaded saved snapshot (saved at: \(date))")
+        do {
+            let snapshots = try JSONDecoder().decode([[String: [String: WindowMatchInfo]]].self, from: data)
+            if let timestamp = defaults.object(forKey: timestampKey) as? Double {
+                let date = Date(timeIntervalSince1970: timestamp)
+                debugPrint("💾 Loaded saved snapshot (saved at: \(date))")
+            }
+            return snapshots
+        } catch {
+            debugPrint("❌ Failed to decode snapshot: \(error.localizedDescription)")
+            return nil
         }
-        
-        return snapshots
     }
     
     /// Get save timestamp
@@ -553,7 +565,29 @@ class ManualSnapshotStorage {
     func clear() {
         defaults.removeObject(forKey: storageKey)
         defaults.removeObject(forKey: timestampKey)
-        print("🗑️ Persisted snapshot cleared")
+        debugPrint("🗑️ Persisted snapshot cleared")
+    }
+    
+    /// Send error notification to user
+    private func sendErrorNotification(title: String, body: String) {
+        guard SnapshotSettings.shared.enableNotification else { return }
+        
+        let content = UNMutableNotificationContent()
+        content.title = title
+        content.body = body
+        content.sound = .default
+        
+        let request = UNNotificationRequest(
+            identifier: UUID().uuidString,
+            content: content,
+            trigger: nil
+        )
+        
+        UNUserNotificationCenter.current().add(request) { error in
+            if let error = error {
+                debugPrint("⚠️ Notification error: \(error.localizedDescription)")
+            }
+        }
     }
     
     /// Check if snapshot exists
