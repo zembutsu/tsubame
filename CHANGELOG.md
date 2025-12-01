@@ -35,6 +35,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Users can safely share logs in GitHub issues without exposing app usage
 
 ### Fixed
+- **Error logging for snapshot operations** (#29)
+  - Replaced silent try? with do-catch blocks in ManualSnapshotStorage
+  - Save/load errors now output to debug log with error details
+  - Save failure triggers user notification for visibility
 - **Crash prevention in Accessibility API calls** (#27)
   - Added nil checks before force casting AXUIElement and AXValue types
   - Validates API success status before accessing return values
