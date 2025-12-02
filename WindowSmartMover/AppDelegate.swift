@@ -39,6 +39,16 @@ private func hotKeyHandler(nextHandler: EventHandlerCallRef?, event: EventRef?, 
             appDelegate.nudgeWindow(direction: .down)
         case 8: // D (move window right)
             appDelegate.nudgeWindow(direction: .right)
+        case 9: // 1 (select slot 1)
+            appDelegate.selectSlotByHotkey(1)
+        case 10: // 2 (select slot 2)
+            appDelegate.selectSlotByHotkey(2)
+        case 11: // 3 (select slot 3)
+            appDelegate.selectSlotByHotkey(3)
+        case 12: // 4 (select slot 4)
+            appDelegate.selectSlotByHotkey(4)
+        case 13: // 5 (select slot 5)
+            appDelegate.selectSlotByHotkey(5)
         default:
             break
         }
@@ -161,6 +171,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     var hotKeyRef6: EventHotKeyRef?  // Window nudge (A: left)
     var hotKeyRef7: EventHotKeyRef?  // Window nudge (S: down)
     var hotKeyRef8: EventHotKeyRef?  // Window nudge (D: right)
+    var hotKeyRef9: EventHotKeyRef?  // Slot 1 (1)
+    var hotKeyRef10: EventHotKeyRef? // Slot 2 (2)
+    var hotKeyRef11: EventHotKeyRef? // Slot 3 (3)
+    var hotKeyRef12: EventHotKeyRef? // Slot 4 (4)
+    var hotKeyRef13: EventHotKeyRef? // Slot 5 (5)
     var eventHandler: EventHandlerRef?
     var settingsWindow: NSWindow?
     var aboutWindow: NSWindow?
@@ -172,10 +187,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     // Timer management (delegated to TimerManager)
     private let timerManager = TimerManager.shared
     
-    // Manual snapshot feature (5 slots, for future expansion)
+    // Manual snapshot feature (6 slots: Slot 0 = auto, Slot 1-5 = manual)
     // New format: using WindowMatchInfo (hashed for privacy protection)
-    private var manualSnapshots: [[String: [String: WindowMatchInfo]]] = Array(repeating: [:], count: 5)
-    private var currentSlotIndex: Int = 0  // Always 0 in v1.2.3
+    private var manualSnapshots: [[String: [String: WindowMatchInfo]]] = Array(repeating: [:], count: 6)
+    
+    // Current slot index for manual operations (1-4, Slot 0 is reserved for auto-snapshot)
+    private var currentSlotIndex: Int {
+        get { ManualSnapshotStorage.shared.activeSlotIndex }
+        set { ManualSnapshotStorage.shared.activeSlotIndex = newValue }
+    }
     
     // Auto snapshot feature
     private var hasInitialSnapshotBeenTaken = false
@@ -343,7 +363,31 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let restoreTitle = String(format: NSLocalizedString("📥 Restore Layout (%@↓)", comment: "Menu item for restoring window layout"), modifierString)
         menu.addItem(NSMenuItem(title: restoreTitle, action: #selector(restoreManualSnapshot), keyEquivalent: ""))
         
-        // Snapshot status
+        menu.addItem(NSMenuItem.separator())
+        
+        // Slot selection submenu
+        let slotMenuItem = NSMenuItem(title: NSLocalizedString("🎯 Slot", comment: "Menu item for slot selection"), action: nil, keyEquivalent: "")
+        let slotSubmenu = NSMenu()
+        
+        for slotIndex in 1...5 {
+            let slotInfo = ManualSnapshotStorage.shared.getSlotInfo(for: slotIndex)
+            let isActive = slotIndex == currentSlotIndex
+            let statusString = getSlotStatusString(for: slotIndex, info: slotInfo)
+            
+            let slotItem = NSMenuItem(
+                title: statusString,
+                action: #selector(selectSlot(_:)),
+                keyEquivalent: ""
+            )
+            slotItem.tag = slotIndex
+            slotItem.state = isActive ? .on : .off
+            slotSubmenu.addItem(slotItem)
+        }
+        
+        slotMenuItem.submenu = slotSubmenu
+        menu.addItem(slotMenuItem)
+        
+        // Current slot status
         let snapshotStatusItem = NSMenuItem(title: getSnapshotStatusString(), action: nil, keyEquivalent: "")
         snapshotStatusItem.isEnabled = false
         menu.addItem(snapshotStatusItem)
@@ -359,21 +403,88 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         statusItem?.menu = menu
     }
     
-    /// Generate snapshot status string
-    private func getSnapshotStatusString() -> String {
-        if let timestamp = ManualSnapshotStorage.shared.getTimestamp() {
+    /// Select snapshot slot
+    @objc private func selectSlot(_ sender: NSMenuItem) {
+        let newSlotIndex = sender.tag
+        guard newSlotIndex >= 1 && newSlotIndex <= 5 else { return }
+        
+        currentSlotIndex = newSlotIndex
+        debugPrint("🎯 Switched to Slot \(newSlotIndex)")
+        
+        // Play sound if enabled
+        if SnapshotSettings.shared.enableSound {
+            NSSound(named: NSSound.Name(SnapshotSettings.shared.soundName))?.play()
+        }
+        
+        // Update menu to reflect selection
+        setupMenu()
+    }
+    
+    /// Select snapshot slot by hotkey (called from hotKeyHandler)
+    func selectSlotByHotkey(_ slotIndex: Int) {
+        guard slotIndex >= 1 && slotIndex <= 5 else { return }
+        
+        currentSlotIndex = slotIndex
+        debugPrint("🎯 Switched to Slot \(slotIndex) (via hotkey)")
+        
+        // Play sound if enabled
+        if SnapshotSettings.shared.enableSound {
+            NSSound(named: NSSound.Name(SnapshotSettings.shared.soundName))?.play()
+        }
+        
+        // Update menu to reflect selection
+        setupMenu()
+    }
+    
+    /// Generate slot status string for submenu
+    private func getSlotStatusString(for slotIndex: Int, info: (windowCount: Int, updatedAt: Date?)?) -> String {
+        let slotLabel = String(format: NSLocalizedString("Slot %d", comment: "Slot label"), slotIndex)
+        
+        guard let info = info, info.windowCount > 0 else {
+            let emptyString = NSLocalizedString("empty", comment: "Slot status when empty")
+            return "\(slotLabel) (\(emptyString))"
+        }
+        
+        if let updatedAt = info.updatedAt {
             let formatter = DateFormatter()
-            formatter.dateFormat = "HH:mm"
-            let timeStr = formatter.string(from: timestamp)
-            
-            // Count saved windows
-            let snapshot = manualSnapshots[currentSlotIndex]
-            let windowCount = snapshot.values.reduce(0) { $0 + $1.count }
-            
-            let format = NSLocalizedString("    💾 %d windows @ %@", comment: "Snapshot status with window count and time")
-            return String(format: format, windowCount, timeStr)
+            // Show date if not today
+            if Calendar.current.isDateInToday(updatedAt) {
+                formatter.dateFormat = "HH:mm"
+            } else {
+                formatter.dateFormat = "MM/dd HH:mm"
+            }
+            let timeStr = formatter.string(from: updatedAt)
+            let format = NSLocalizedString("%d windows @ %@", comment: "Slot status with window count and time")
+            return "\(slotLabel) (\(String(format: format, info.windowCount, timeStr)))"
         } else {
-            return NSLocalizedString("    💾 No data", comment: "Snapshot status when no data exists")
+            let format = NSLocalizedString("%d windows", comment: "Slot status with window count only")
+            return "\(slotLabel) (\(String(format: format, info.windowCount)))"
+        }
+    }
+    
+    /// Generate snapshot status string for current slot
+    private func getSnapshotStatusString() -> String {
+        let slotInfo = ManualSnapshotStorage.shared.getSlotInfo(for: currentSlotIndex)
+        
+        if let info = slotInfo, info.windowCount > 0 {
+            if let updatedAt = info.updatedAt {
+                let formatter = DateFormatter()
+                // Show date if not today
+                if Calendar.current.isDateInToday(updatedAt) {
+                    formatter.dateFormat = "HH:mm"
+                } else {
+                    formatter.dateFormat = "MM/dd HH:mm"
+                }
+                let timeStr = formatter.string(from: updatedAt)
+                let format = NSLocalizedString("    💾 Slot %d: %d windows @ %@", comment: "Snapshot status with slot, window count and time")
+                return String(format: format, currentSlotIndex, info.windowCount, timeStr)
+            } else {
+                let format = NSLocalizedString("    💾 Slot %d: %d windows", comment: "Snapshot status with slot and window count")
+                return String(format: format, currentSlotIndex, info.windowCount)
+            }
+        } else {
+            let format = NSLocalizedString("    💾 Slot %d: No data", comment: "Snapshot status when no data exists")
+            return String(format: format, currentSlotIndex)
         }
     }
     
@@ -478,10 +589,15 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             HotKeyDef(keyCode: UInt32(kVK_ANSI_A), symbol: "A", description: "Nudge left", id: 6),
             HotKeyDef(keyCode: UInt32(kVK_ANSI_S), symbol: "S", description: "Nudge down", id: 7),
             HotKeyDef(keyCode: UInt32(kVK_ANSI_D), symbol: "D", description: "Nudge right", id: 8),
+            HotKeyDef(keyCode: UInt32(kVK_ANSI_1), symbol: "1", description: "Select Slot 1", id: 9),
+            HotKeyDef(keyCode: UInt32(kVK_ANSI_2), symbol: "2", description: "Select Slot 2", id: 10),
+            HotKeyDef(keyCode: UInt32(kVK_ANSI_3), symbol: "3", description: "Select Slot 3", id: 11),
+            HotKeyDef(keyCode: UInt32(kVK_ANSI_4), symbol: "4", description: "Select Slot 4", id: 12),
+            HotKeyDef(keyCode: UInt32(kVK_ANSI_5), symbol: "5", description: "Select Slot 5", id: 13),
         ]
         
         // Array to store hotkey refs (index corresponds to id - 1)
-        var hotKeyRefs: [EventHotKeyRef?] = Array(repeating: nil, count: 8)
+        var hotKeyRefs: [EventHotKeyRef?] = Array(repeating: nil, count: 13)
         
         for def in hotKeyDefs {
             let hotKeyID = EventHotKeyID(signature: OSType(0x4D4F5645), id: def.id) // 'MOVE' + id
@@ -506,6 +622,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         hotKeyRef6 = hotKeyRefs[5]
         hotKeyRef7 = hotKeyRefs[6]
         hotKeyRef8 = hotKeyRefs[7]
+        hotKeyRef9 = hotKeyRefs[8]
+        hotKeyRef10 = hotKeyRefs[9]
+        hotKeyRef11 = hotKeyRefs[10]
+        hotKeyRef12 = hotKeyRefs[11]
+        hotKeyRef13 = hotKeyRefs[12]
         
         return failedHotkeys
     }
@@ -570,6 +691,26 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         if let hotKey = hotKeyRef8 {
             UnregisterEventHotKey(hotKey)
             hotKeyRef8 = nil
+        }
+        if let hotKey = hotKeyRef9 {
+            UnregisterEventHotKey(hotKey)
+            hotKeyRef9 = nil
+        }
+        if let hotKey = hotKeyRef10 {
+            UnregisterEventHotKey(hotKey)
+            hotKeyRef10 = nil
+        }
+        if let hotKey = hotKeyRef11 {
+            UnregisterEventHotKey(hotKey)
+            hotKeyRef11 = nil
+        }
+        if let hotKey = hotKeyRef12 {
+            UnregisterEventHotKey(hotKey)
+            hotKeyRef12 = nil
+        }
+        if let hotKey = hotKeyRef13 {
+            UnregisterEventHotKey(hotKey)
+            hotKeyRef13 = nil
         }
         debugPrint("🔑 All hotkeys unregistered")
     }
@@ -1608,7 +1749,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     
     /// Clear manual snapshots
     private func clearManualSnapshots() {
-        manualSnapshots = Array(repeating: [:], count: 5)
+        manualSnapshots = Array(repeating: [:], count: 6)
         debugPrint("🗑️ In-memory snapshot cleared")
     }
     
@@ -1733,16 +1874,17 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             }
         }
         
-        // Existing data protection check
+        // Existing data protection check (for auto slot only)
         let snapshotSettings = SnapshotSettings.shared
-        if snapshotSettings.protectExistingSnapshot && ManualSnapshotStorage.shared.hasSnapshot {
+        if snapshotSettings.protectExistingSnapshot && ManualSnapshotStorage.shared.hasSnapshot(for: 0) {
             if savedCount < snapshotSettings.minimumWindowCount {
                 debugPrint("🛡️ Data protection: window count is\(savedCount) (min:\(snapshotSettings.minimumWindowCount)), skipping overwrite")
                 return
             }
         }
         
-        manualSnapshots[currentSlotIndex] = snapshot
+        // Auto snapshot always saves to Slot 0 (reserved for auto)
+        manualSnapshots[0] = snapshot
         
         // Persist
         ManualSnapshotStorage.shared.save(manualSnapshots)

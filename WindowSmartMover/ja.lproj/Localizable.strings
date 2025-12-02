@@ -142,3 +142,14 @@
 "The following shortcuts could not be registered:\n\n%@\n\nThis usually means another app is using the same shortcut. Check System Settings → Keyboard → Shortcuts, or try different modifier keys in Tsubame Settings." = "以下のショートカットを登録できませんでした:\n\n%@\n\n通常、他のアプリが同じショートカットを使用しています。システム設定 → キーボード → ショートカットを確認するか、Tsubameの設定で別の修飾キーをお試しください。";
 "Open Settings" = "設定を開く";
 "OK" = "OK";
+
+// MARK: - Snapshot Slots (#32)
+
+"🎯 Slot" = "🎯 スロット";
+"Slot %d" = "スロット %d";
+"empty" = "空";
+"%d windows @ %@" = "%d個 @ %@";
+"%d windows" = "%d個";
+"    💾 Slot %d: %d windows @ %@" = "    💾 スロット %d: %d個 @ %@";
+"    💾 Slot %d: %d windows" = "    💾 スロット %d: %d個";
+"    💾 Slot %d: No data" = "    💾 スロット %d: データなし";

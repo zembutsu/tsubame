@@ -38,6 +38,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Shows which shortcuts failed and suggests solutions
   - "Open Settings" button for quick access to change modifier keys
   - Helps users identify conflicts with other apps or system shortcuts
+- **Multiple Snapshot Slots** (#32)
+  - 5 manual snapshot slots for different scenarios (Home, Office, Presentation, etc.)
+  - Slot selection via menu bar submenu (🎯 Slot) or hotkeys (modifier + 1-5)
+  - Each slot shows window count and last update time (with date if not today)
+  - Sound feedback on slot switch (when sound is enabled)
+  - Auto-snapshot uses dedicated Slot 0 (internal, not shown in menu)
+  - Manual snapshots (modifier + ↑/↓) operate on the selected slot (1-5)
+  - Selected slot persists across app restarts
+  - Data structure designed for future Spaces/virtual desktop support
+  - Future: Custom slot naming (data structure ready, UI planned for v1.3.0+)
 
 ### Improved
 - **Restart UX for Settings Changes** (#25)
@@ -109,10 +119,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added `HotKeySettings.modifiersDidChangeNotification` for immediate re-registration
 - Added `setupHotkeySettingsObserver()` in AppDelegate for hotkey change detection
 - TimerManager uses singleton pattern consistent with other Settings classes
+- Added `SnapshotSlot` struct with metadata dictionary for future extensibility
+- Storage format upgraded from V2 (array) to V3 (SnapshotSlot array) with automatic migration
+- `currentSlotIndex` now computed property backed by `ManualSnapshotStorage.activeSlotIndex`
+- Auto-snapshot hardcoded to Slot 0, manual operations use Slots 1-4
+- Menu bar slot submenu with radio-button style selection
+- Added hotkeys 9-13 for slot selection (modifier + 1-5)
+- Added `selectSlotByHotkey()` method for hotkey-triggered slot switching
+- Total registered hotkeys increased from 8 to 13
+- Slot switch plays sound feedback when sound notifications are enabled
+- Date display shows MM/dd HH:mm for non-today timestamps
 
 ### Migration Notes
 - Existing snapshots will not match after upgrade (different hash values)
 - Simply save a new snapshot after upgrading - no manual intervention needed
+- Snapshot data automatically migrates from V2 to V3 format on first launch
+- Existing single slot data moves to Slot 0 (auto); manual slots start empty
 
 
 ## [1.2.7] - 2025-11-29
