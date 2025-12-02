@@ -43,6 +43,22 @@ A lightweight macOS menu bar app for effortless window management across multipl
 - **Current Limitations**:
   - Fullscreen/minimized windows excluded
 
+### Multiple Snapshot Slots (v1.2.8+)
+- **5 Snapshot Slots**: Save different layouts for different scenarios
+  - Home office setup
+  - External monitor at work
+  - Presentation mode
+  - And more...
+- **Quick Slot Switching**: Via menu or hotkeys
+  - `⌃⌘1` through `⌃⌘5` to switch slots
+  - Sound feedback when switching (if sound enabled)
+- **Smart Timestamp Display**: 
+  - Shows time for today's saves
+  - Shows date + time for older saves (MM/dd HH:mm)
+- **Auto-Snapshot Isolation**: Auto-snapshots use a dedicated internal slot (Slot 0), never overwriting your manual saves
+
+> 💡 **Design Note**: We evaluated three architectural approaches for multiple slots: (A) shared slots for auto/manual, (B) reserved Slot 0 for auto, manual slots 1-5, (C) remove auto-snapshot entirely. We chose **Option B** to preserve the proven auto-restoration logic while ensuring manual saves are never overwritten. The data structure includes a `metadata` dictionary for future extensibility (Spaces/virtual desktop support). — *Design Decision #32, 2025-12-02*
+
 ### Auto Snapshot & Persistence (v1.2.4+)
 - **Automatic Snapshot**: Never forget to save your layout
   - Initial snapshot taken automatically after app launch (configurable: 0.5-60 min, default 15 min)
@@ -107,13 +123,27 @@ A lightweight macOS menu bar app for effortless window management across multipl
   - Enables international collaboration on bug reports
   - Code comments also in English for contributors
 
+### Improved User Experience (v1.2.8+)
+- **Hotkey Conflict Detection**: Know immediately if shortcuts fail to register
+  - Alert dialog shows which shortcuts couldn't be registered
+  - Suggests checking System Settings or trying different modifier keys
+  - "Open Settings" button for quick access
+- **Instant Hotkey Changes**: No restart required for modifier key changes
+  - Change modifier keys in Settings, use immediately
+  - Only language changes still require restart
+- **Enhanced Privacy**: App names masked in debug logs by default
+  - Share logs safely without exposing your app usage
+  - Toggle in Settings → Debug → "Mask app names"
+
 ### Coming Soon 🚧
 
 ⚠️ **Note**: These features are under active development.
 
 - **Enhanced Snapshot Features**:
-  - Multiple snapshot slots with UI selection
+  - Custom slot naming (data structure ready)
   - Snapshot management interface (list, rename, delete)
+- **Spaces/Virtual Desktop Support**: 
+  - Auto-select slot based on current Space (planned)
 
 For detailed development progress, see [CHANGELOG.md](CHANGELOG.md).
 
@@ -267,6 +297,12 @@ No sensitive information is logged or transmitted.
 - [x] Code comments translated to English
 - [x] App name masking in logs (#21)
 - [x] Startup information in debug log (#21)
+- [x] **Multiple snapshot slots (5 slots)** (#32)
+- [x] **Slot selection via hotkeys (modifier + 1-5)** (#32)
+- [x] **Sound feedback on slot switch** (#32)
+- [x] **Hotkey registration failure warning** (#31)
+- [x] **Instant hotkey changes (no restart required)** (#25)
+- [x] **TimerManager refactoring for better maintainability** (#28)
 
 ### Completed (v1.2.7)
 - [x] Changed default hotkey from ⌃⌥⌘ to ⌃⌘ (#5)
@@ -324,12 +360,13 @@ No sensitive information is logged or transmitted.
 - [ ] Binary distribution via GitHub Releases
 
 ### Future Considerations (Post v1.3.0)
-- [ ] Enhanced snapshot features (multiple slots with UI selection)
+- [ ] Custom slot naming UI
+- [ ] Spaces/virtual desktop auto-slot selection
 - [ ] Snapshot management interface (list, rename, delete)
 - [ ] Support for more than 2 displays
 - [ ] Per-app window restoration rules
 - [ ] Export/Import snapshots as JSON
-- [ ] Improved restart UX for settings changes
+- [ ] Migration to Application Support directory (#30)
 
 For detailed development plans, see [CHANGELOG.md](CHANGELOG.md).
 

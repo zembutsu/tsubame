@@ -12,7 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - App Store release preparation
 - Binary distribution via GitHub Releases
 
-## [1.2.8] - WIP
+## [1.2.8] - 2025-12-02
 
 ### Added
 - **Internationalization (i18n)** (#2)
