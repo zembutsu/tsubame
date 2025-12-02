@@ -39,6 +39,16 @@ private func hotKeyHandler(nextHandler: EventHandlerCallRef?, event: EventRef?, 
             appDelegate.nudgeWindow(direction: .down)
         case 8: // D (move window right)
             appDelegate.nudgeWindow(direction: .right)
+        case 9: // 1 (select slot 1)
+            appDelegate.selectSlotByHotkey(1)
+        case 10: // 2 (select slot 2)
+            appDelegate.selectSlotByHotkey(2)
+        case 11: // 3 (select slot 3)
+            appDelegate.selectSlotByHotkey(3)
+        case 12: // 4 (select slot 4)
+            appDelegate.selectSlotByHotkey(4)
+        case 13: // 5 (select slot 5)
+            appDelegate.selectSlotByHotkey(5)
         default:
             break
         }
@@ -161,6 +171,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     var hotKeyRef6: EventHotKeyRef?  // Window nudge (A: left)
     var hotKeyRef7: EventHotKeyRef?  // Window nudge (S: down)
     var hotKeyRef8: EventHotKeyRef?  // Window nudge (D: right)
+    var hotKeyRef9: EventHotKeyRef?  // Slot 1 (1)
+    var hotKeyRef10: EventHotKeyRef? // Slot 2 (2)
+    var hotKeyRef11: EventHotKeyRef? // Slot 3 (3)
+    var hotKeyRef12: EventHotKeyRef? // Slot 4 (4)
+    var hotKeyRef13: EventHotKeyRef? // Slot 5 (5)
     var eventHandler: EventHandlerRef?
     var settingsWindow: NSWindow?
     var aboutWindow: NSWindow?
@@ -168,23 +183,22 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     
     // Display memory feature (new format: using WindowMatchInfo)
     private var windowPositions: [String: [String: WindowMatchInfo]] = [:]
-    private var snapshotTimer: Timer?
     
-    // Manual snapshot feature (5 slots, for future expansion)
+    // Timer management (delegated to TimerManager)
+    private let timerManager = TimerManager.shared
+    
+    // Manual snapshot feature (6 slots: Slot 0 = auto, Slot 1-5 = manual)
     // New format: using WindowMatchInfo (hashed for privacy protection)
-    private var manualSnapshots: [[String: [String: WindowMatchInfo]]] = Array(repeating: [:], count: 5)
-    private var currentSlotIndex: Int = 0  // Always 0 in v1.2.3
+    private var manualSnapshots: [[String: [String: WindowMatchInfo]]] = Array(repeating: [:], count: 6)
+    
+    // Current slot index for manual operations (1-4, Slot 0 is reserved for auto-snapshot)
+    private var currentSlotIndex: Int {
+        get { ManualSnapshotStorage.shared.activeSlotIndex }
+        set { ManualSnapshotStorage.shared.activeSlotIndex = newValue }
+    }
     
     // Auto snapshot feature
-    private var initialSnapshotTimer: Timer?
-    private var periodicSnapshotTimer: Timer?
     private var hasInitialSnapshotBeenTaken = false
-    
-    // Display change stabilization timer
-    private var displayStabilizationTimer: Timer?
-    
-    // Restore work item (cancellable)
-    private var restoreWorkItem: DispatchWorkItem?
     
     // Display monitoring enabled/disabled state
     private var isDisplayMonitoringEnabled = true
@@ -192,14 +206,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     // Last display change time (for stabilization detection)
     private var lastDisplayChangeTime: Date?
     
-    // Stabilization check timer
-    private var stabilizationCheckTimer: Timer?
-    
     // Event occurred after stabilization flag
     private var eventOccurredAfterStabilization = false
-    
-    // Fallback timer
-    private var fallbackTimer: DispatchWorkItem?
     
     // Restore retry feature
     private var restoreRetryCount: Int = 0
@@ -247,7 +255,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         setupMenu()
         
         // Register global hotkeys
-        registerHotKeys()
+        let failedHotkeys = registerHotKeys()
+        
+        // Show warning if any hotkey registration failed
+        if !failedHotkeys.isEmpty {
+            showHotkeyRegistrationWarning(failedHotkeys: failedHotkeys)
+        }
         
         // Check accessibility permissions
         checkAccessibilityPermissions()
@@ -260,6 +273,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         // Setup snapshot settings observers
         setupSnapshotSettingsObservers()
+        
+        // Setup hotkey settings observer
+        setupHotkeySettingsObserver()
         
         // Start periodic snapshot for display memory
         startPeriodicSnapshot()
@@ -347,7 +363,31 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let restoreTitle = String(format: NSLocalizedString("📥 Restore Layout (%@↓)", comment: "Menu item for restoring window layout"), modifierString)
         menu.addItem(NSMenuItem(title: restoreTitle, action: #selector(restoreManualSnapshot), keyEquivalent: ""))
         
-        // Snapshot status
+        menu.addItem(NSMenuItem.separator())
+        
+        // Slot selection submenu
+        let slotMenuItem = NSMenuItem(title: NSLocalizedString("🎯 Slot", comment: "Menu item for slot selection"), action: nil, keyEquivalent: "")
+        let slotSubmenu = NSMenu()
+        
+        for slotIndex in 1...5 {
+            let slotInfo = ManualSnapshotStorage.shared.getSlotInfo(for: slotIndex)
+            let isActive = slotIndex == currentSlotIndex
+            let statusString = getSlotStatusString(for: slotIndex, info: slotInfo)
+            
+            let slotItem = NSMenuItem(
+                title: statusString,
+                action: #selector(selectSlot(_:)),
+                keyEquivalent: ""
+            )
+            slotItem.tag = slotIndex
+            slotItem.state = isActive ? .on : .off
+            slotSubmenu.addItem(slotItem)
+        }
+        
+        slotMenuItem.submenu = slotSubmenu
+        menu.addItem(slotMenuItem)
+        
+        // Current slot status
         let snapshotStatusItem = NSMenuItem(title: getSnapshotStatusString(), action: nil, keyEquivalent: "")
         snapshotStatusItem.isEnabled = false
         menu.addItem(snapshotStatusItem)
@@ -363,21 +403,88 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         statusItem?.menu = menu
     }
     
-    /// Generate snapshot status string
-    private func getSnapshotStatusString() -> String {
-        if let timestamp = ManualSnapshotStorage.shared.getTimestamp() {
+    /// Select snapshot slot
+    @objc private func selectSlot(_ sender: NSMenuItem) {
+        let newSlotIndex = sender.tag
+        guard newSlotIndex >= 1 && newSlotIndex <= 5 else { return }
+        
+        currentSlotIndex = newSlotIndex
+        debugPrint("🎯 Switched to Slot \(newSlotIndex)")
+        
+        // Play sound if enabled
+        if SnapshotSettings.shared.enableSound {
+            NSSound(named: NSSound.Name(SnapshotSettings.shared.soundName))?.play()
+        }
+        
+        // Update menu to reflect selection
+        setupMenu()
+    }
+    
+    /// Select snapshot slot by hotkey (called from hotKeyHandler)
+    func selectSlotByHotkey(_ slotIndex: Int) {
+        guard slotIndex >= 1 && slotIndex <= 5 else { return }
+        
+        currentSlotIndex = slotIndex
+        debugPrint("🎯 Switched to Slot \(slotIndex) (via hotkey)")
+        
+        // Play sound if enabled
+        if SnapshotSettings.shared.enableSound {
+            NSSound(named: NSSound.Name(SnapshotSettings.shared.soundName))?.play()
+        }
+        
+        // Update menu to reflect selection
+        setupMenu()
+    }
+    
+    /// Generate slot status string for submenu
+    private func getSlotStatusString(for slotIndex: Int, info: (windowCount: Int, updatedAt: Date?)?) -> String {
+        let slotLabel = String(format: NSLocalizedString("Slot %d", comment: "Slot label"), slotIndex)
+        
+        guard let info = info, info.windowCount > 0 else {
+            let emptyString = NSLocalizedString("empty", comment: "Slot status when empty")
+            return "\(slotLabel) (\(emptyString))"
+        }
+        
+        if let updatedAt = info.updatedAt {
             let formatter = DateFormatter()
-            formatter.dateFormat = "HH:mm"
-            let timeStr = formatter.string(from: timestamp)
-            
-            // Count saved windows
-            let snapshot = manualSnapshots[currentSlotIndex]
-            let windowCount = snapshot.values.reduce(0) { $0 + $1.count }
-            
-            let format = NSLocalizedString("    💾 %d windows @ %@", comment: "Snapshot status with window count and time")
-            return String(format: format, windowCount, timeStr)
+            // Show date if not today
+            if Calendar.current.isDateInToday(updatedAt) {
+                formatter.dateFormat = "HH:mm"
+            } else {
+                formatter.dateFormat = "MM/dd HH:mm"
+            }
+            let timeStr = formatter.string(from: updatedAt)
+            let format = NSLocalizedString("%d windows @ %@", comment: "Slot status with window count and time")
+            return "\(slotLabel) (\(String(format: format, info.windowCount, timeStr)))"
         } else {
-            return NSLocalizedString("    💾 No data", comment: "Snapshot status when no data exists")
+            let format = NSLocalizedString("%d windows", comment: "Slot status with window count only")
+            return "\(slotLabel) (\(String(format: format, info.windowCount)))"
+        }
+    }
+    
+    /// Generate snapshot status string for current slot
+    private func getSnapshotStatusString() -> String {
+        let slotInfo = ManualSnapshotStorage.shared.getSlotInfo(for: currentSlotIndex)
+        
+        if let info = slotInfo, info.windowCount > 0 {
+            if let updatedAt = info.updatedAt {
+                let formatter = DateFormatter()
+                // Show date if not today
+                if Calendar.current.isDateInToday(updatedAt) {
+                    formatter.dateFormat = "HH:mm"
+                } else {
+                    formatter.dateFormat = "MM/dd HH:mm"
+                }
+                let timeStr = formatter.string(from: updatedAt)
+                let format = NSLocalizedString("    💾 Slot %d: %d windows @ %@", comment: "Snapshot status with slot, window count and time")
+                return String(format: format, currentSlotIndex, info.windowCount, timeStr)
+            } else {
+                let format = NSLocalizedString("    💾 Slot %d: %d windows", comment: "Snapshot status with slot and window count")
+                return String(format: format, currentSlotIndex, info.windowCount)
+            }
+        } else {
+            let format = NSLocalizedString("    💾 Slot %d: No data", comment: "Snapshot status when no data exists")
+            return String(format: format, currentSlotIndex)
         }
     }
     
@@ -445,7 +552,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
     
-    func registerHotKeys() {
+    /// Register hotkeys and return list of failed registrations
+    @discardableResult
+    func registerHotKeys() -> [String] {
+        var failedHotkeys: [String] = []
+        
         // Install event handler
         var eventType = EventTypeSpec(eventClass: OSType(kEventClassKeyboard), eventKind: UInt32(kEventHotKeyPressed))
         let status = InstallEventHandler(GetApplicationEventTarget(), hotKeyHandler, 1, &eventType, nil, &eventHandler)
@@ -459,102 +570,149 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Register hotkeys
         let settings = HotKeySettings.shared
         let modifiers = settings.getModifiers()
+        let modifierString = settings.getModifierString()
         
-        // Hotkey 1: Move to next screen (right arrow)
-        let hotKeyID1 = EventHotKeyID(signature: OSType(0x4D4F5645), id: 1) // 'MOVE' + 1
-        let keyCode1 = UInt32(kVK_RightArrow)
-        let registerStatus1 = RegisterEventHotKey(keyCode1, modifiers, hotKeyID1, GetApplicationEventTarget(), 0, &hotKeyRef)
-        
-        if registerStatus1 == noErr {
-            let modifierString = settings.getModifierString()
-            debugPrint("✅ Hotkey 1 (\(modifierString)→) registered")
-        } else {
-            debugPrint("❌ Failed to register hotkey 1: \(registerStatus1)")
+        // Hotkey definitions: (keyCode, description, hotKeyRef pointer, id)
+        struct HotKeyDef {
+            let keyCode: UInt32
+            let symbol: String
+            let description: String
+            let id: UInt32
         }
         
-        // Hotkey 2: Move to previous screen (left arrow)
-        let hotKeyID2 = EventHotKeyID(signature: OSType(0x4D4F5645), id: 2) // 'MOVE' + 2
-        let keyCode2 = UInt32(kVK_LeftArrow)
-        let registerStatus2 = RegisterEventHotKey(keyCode2, modifiers, hotKeyID2, GetApplicationEventTarget(), 0, &hotKeyRef2)
+        let hotKeyDefs: [HotKeyDef] = [
+            HotKeyDef(keyCode: UInt32(kVK_RightArrow), symbol: "→", description: "Move to next screen", id: 1),
+            HotKeyDef(keyCode: UInt32(kVK_LeftArrow), symbol: "←", description: "Move to previous screen", id: 2),
+            HotKeyDef(keyCode: UInt32(kVK_UpArrow), symbol: "↑", description: "Save snapshot", id: 3),
+            HotKeyDef(keyCode: UInt32(kVK_DownArrow), symbol: "↓", description: "Restore snapshot", id: 4),
+            HotKeyDef(keyCode: UInt32(kVK_ANSI_W), symbol: "W", description: "Nudge up", id: 5),
+            HotKeyDef(keyCode: UInt32(kVK_ANSI_A), symbol: "A", description: "Nudge left", id: 6),
+            HotKeyDef(keyCode: UInt32(kVK_ANSI_S), symbol: "S", description: "Nudge down", id: 7),
+            HotKeyDef(keyCode: UInt32(kVK_ANSI_D), symbol: "D", description: "Nudge right", id: 8),
+            HotKeyDef(keyCode: UInt32(kVK_ANSI_1), symbol: "1", description: "Select Slot 1", id: 9),
+            HotKeyDef(keyCode: UInt32(kVK_ANSI_2), symbol: "2", description: "Select Slot 2", id: 10),
+            HotKeyDef(keyCode: UInt32(kVK_ANSI_3), symbol: "3", description: "Select Slot 3", id: 11),
+            HotKeyDef(keyCode: UInt32(kVK_ANSI_4), symbol: "4", description: "Select Slot 4", id: 12),
+            HotKeyDef(keyCode: UInt32(kVK_ANSI_5), symbol: "5", description: "Select Slot 5", id: 13),
+        ]
         
-        if registerStatus2 == noErr {
-            let modifierString = settings.getModifierString()
-            debugPrint("✅ Hotkey 2 (\(modifierString)←) registered")
-        } else {
-            debugPrint("❌ Failed to register hotkey 2: \(registerStatus2)")
+        // Array to store hotkey refs (index corresponds to id - 1)
+        var hotKeyRefs: [EventHotKeyRef?] = Array(repeating: nil, count: 13)
+        
+        for def in hotKeyDefs {
+            let hotKeyID = EventHotKeyID(signature: OSType(0x4D4F5645), id: def.id) // 'MOVE' + id
+            var newHotKeyRef: EventHotKeyRef?
+            let registerStatus = RegisterEventHotKey(def.keyCode, modifiers, hotKeyID, GetApplicationEventTarget(), 0, &newHotKeyRef)
+            
+            if registerStatus == noErr {
+                debugPrint("✅ Hotkey \(def.id) (\(modifierString)\(def.symbol)) registered")
+                hotKeyRefs[Int(def.id) - 1] = newHotKeyRef
+            } else {
+                debugPrint("❌ Failed to register hotkey \(def.id): \(registerStatus)")
+                failedHotkeys.append("\(modifierString)\(def.symbol) (\(def.description))")
+            }
         }
         
-        // Hotkey 3: Save snapshot (up arrow)
-        let hotKeyID3 = EventHotKeyID(signature: OSType(0x4D4F5645), id: 3) // 'MOVE' + 3
-        let keyCode3 = UInt32(kVK_UpArrow)
-        let registerStatus3 = RegisterEventHotKey(keyCode3, modifiers, hotKeyID3, GetApplicationEventTarget(), 0, &hotKeyRef3)
+        // Assign to instance variables
+        hotKeyRef = hotKeyRefs[0]
+        hotKeyRef2 = hotKeyRefs[1]
+        hotKeyRef3 = hotKeyRefs[2]
+        hotKeyRef4 = hotKeyRefs[3]
+        hotKeyRef5 = hotKeyRefs[4]
+        hotKeyRef6 = hotKeyRefs[5]
+        hotKeyRef7 = hotKeyRefs[6]
+        hotKeyRef8 = hotKeyRefs[7]
+        hotKeyRef9 = hotKeyRefs[8]
+        hotKeyRef10 = hotKeyRefs[9]
+        hotKeyRef11 = hotKeyRefs[10]
+        hotKeyRef12 = hotKeyRefs[11]
+        hotKeyRef13 = hotKeyRefs[12]
         
-        if registerStatus3 == noErr {
-            let modifierString = settings.getModifierString()
-            debugPrint("✅ Hotkey 3 (\(modifierString)↑) registered")
-        } else {
-            debugPrint("❌ Failed to register hotkey 3: \(registerStatus3)")
+        return failedHotkeys
+    }
+    
+    /// Show alert for failed hotkey registrations
+    private func showHotkeyRegistrationWarning(failedHotkeys: [String]) {
+        guard !failedHotkeys.isEmpty else { return }
+        
+        let alert = NSAlert()
+        alert.alertStyle = .warning
+        alert.messageText = NSLocalizedString("Hotkey Registration Failed", comment: "Alert title for hotkey registration failure")
+        
+        let failedList = failedHotkeys.map { "• \($0)" }.joined(separator: "\n")
+        let informativeText = String(format: NSLocalizedString(
+            "The following shortcuts could not be registered:\n\n%@\n\nThis usually means another app is using the same shortcut. Check System Settings → Keyboard → Shortcuts, or try different modifier keys in Tsubame Settings.",
+            comment: "Alert message for hotkey registration failure"
+        ), failedList)
+        alert.informativeText = informativeText
+        
+        alert.addButton(withTitle: NSLocalizedString("Open Settings", comment: "Button to open settings"))
+        alert.addButton(withTitle: NSLocalizedString("OK", comment: "OK button"))
+        
+        // Show alert on main thread
+        DispatchQueue.main.async { [weak self] in
+            let response = alert.runModal()
+            if response == .alertFirstButtonReturn {
+                self?.openSettings()
+            }
         }
-        
-        // Hotkey 4: Restore snapshot (down arrow)
-        let hotKeyID4 = EventHotKeyID(signature: OSType(0x4D4F5645), id: 4) // 'MOVE' + 4
-        let keyCode4 = UInt32(kVK_DownArrow)
-        let registerStatus4 = RegisterEventHotKey(keyCode4, modifiers, hotKeyID4, GetApplicationEventTarget(), 0, &hotKeyRef4)
-        
-        if registerStatus4 == noErr {
-            let modifierString = settings.getModifierString()
-            debugPrint("✅ Hotkey 4 (\(modifierString)↓) registered")
-        } else {
-            debugPrint("❌ Failed to register hotkey 4: \(registerStatus4)")
+    }
+    
+    /// Unregister all hotkeys (for cleanup or re-registration)
+    func unregisterHotKeys() {
+        if let hotKey = hotKeyRef {
+            UnregisterEventHotKey(hotKey)
+            hotKeyRef = nil
         }
-        
-        // Hotkey 5: Window nudge up (W)
-        let hotKeyID5 = EventHotKeyID(signature: OSType(0x4D4F5645), id: 5) // 'MOVE' + 5
-        let keyCode5 = UInt32(kVK_ANSI_W)
-        let registerStatus5 = RegisterEventHotKey(keyCode5, modifiers, hotKeyID5, GetApplicationEventTarget(), 0, &hotKeyRef5)
-        
-        if registerStatus5 == noErr {
-            let modifierString = settings.getModifierString()
-            debugPrint("✅ Hotkey 5 (\(modifierString)W) registered")
-        } else {
-            debugPrint("❌ Failed to register hotkey 5: \(registerStatus5)")
+        if let hotKey = hotKeyRef2 {
+            UnregisterEventHotKey(hotKey)
+            hotKeyRef2 = nil
         }
-        
-        // Hotkey 6: Window nudge left (A)
-        let hotKeyID6 = EventHotKeyID(signature: OSType(0x4D4F5645), id: 6) // 'MOVE' + 6
-        let keyCode6 = UInt32(kVK_ANSI_A)
-        let registerStatus6 = RegisterEventHotKey(keyCode6, modifiers, hotKeyID6, GetApplicationEventTarget(), 0, &hotKeyRef6)
-        
-        if registerStatus6 == noErr {
-            let modifierString = settings.getModifierString()
-            debugPrint("✅ Hotkey 6 (\(modifierString)A) registered")
-        } else {
-            debugPrint("❌ Failed to register hotkey 6: \(registerStatus6)")
+        if let hotKey = hotKeyRef3 {
+            UnregisterEventHotKey(hotKey)
+            hotKeyRef3 = nil
         }
-        
-        // Hotkey 7: Window nudge down (S)
-        let hotKeyID7 = EventHotKeyID(signature: OSType(0x4D4F5645), id: 7) // 'MOVE' + 7
-        let keyCode7 = UInt32(kVK_ANSI_S)
-        let registerStatus7 = RegisterEventHotKey(keyCode7, modifiers, hotKeyID7, GetApplicationEventTarget(), 0, &hotKeyRef7)
-        
-        if registerStatus7 == noErr {
-            let modifierString = settings.getModifierString()
-            debugPrint("✅ Hotkey 7 (\(modifierString)S) registered")
-        } else {
-            debugPrint("❌ Failed to register hotkey 7: \(registerStatus7)")
+        if let hotKey = hotKeyRef4 {
+            UnregisterEventHotKey(hotKey)
+            hotKeyRef4 = nil
         }
-        
-        // Hotkey 8: Window nudge right (D)
-        let hotKeyID8 = EventHotKeyID(signature: OSType(0x4D4F5645), id: 8) // 'MOVE' + 8
-        let keyCode8 = UInt32(kVK_ANSI_D)
-        let registerStatus8 = RegisterEventHotKey(keyCode8, modifiers, hotKeyID8, GetApplicationEventTarget(), 0, &hotKeyRef8)
-        
-        if registerStatus8 == noErr {
-            let modifierString = settings.getModifierString()
-            debugPrint("✅ Hotkey 8 (\(modifierString)D) registered")
-        } else {
-            debugPrint("❌ Failed to register hotkey 8: \(registerStatus8)")
+        if let hotKey = hotKeyRef5 {
+            UnregisterEventHotKey(hotKey)
+            hotKeyRef5 = nil
         }
+        if let hotKey = hotKeyRef6 {
+            UnregisterEventHotKey(hotKey)
+            hotKeyRef6 = nil
+        }
+        if let hotKey = hotKeyRef7 {
+            UnregisterEventHotKey(hotKey)
+            hotKeyRef7 = nil
+        }
+        if let hotKey = hotKeyRef8 {
+            UnregisterEventHotKey(hotKey)
+            hotKeyRef8 = nil
+        }
+        if let hotKey = hotKeyRef9 {
+            UnregisterEventHotKey(hotKey)
+            hotKeyRef9 = nil
+        }
+        if let hotKey = hotKeyRef10 {
+            UnregisterEventHotKey(hotKey)
+            hotKeyRef10 = nil
+        }
+        if let hotKey = hotKeyRef11 {
+            UnregisterEventHotKey(hotKey)
+            hotKeyRef11 = nil
+        }
+        if let hotKey = hotKeyRef12 {
+            UnregisterEventHotKey(hotKey)
+            hotKeyRef12 = nil
+        }
+        if let hotKey = hotKeyRef13 {
+            UnregisterEventHotKey(hotKey)
+            hotKeyRef13 = nil
+        }
+        debugPrint("🔑 All hotkeys unregistered")
     }
     
     @objc func moveWindowToNextScreen() {
@@ -787,24 +945,21 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             lastDisplayChangeTime = Date()
             
             // Start timer if not already running
-            if stabilizationCheckTimer == nil {
+            if !timerManager.isStabilizationCheckRunning {
                 startStabilizationCheck()
             }
             return
         }
         
         // If monitoring is enabled - cancel fallback and restore
-        fallbackTimer?.cancel()
+        timerManager.cancelFallback()
         eventOccurredAfterStabilization = true
         triggerRestoration()
     }
     
     /// Start stabilization check timer
     private func startStabilizationCheck() {
-        stabilizationCheckTimer?.invalidate()
-        
-        // Check stabilization every 0.5 seconds
-        stabilizationCheckTimer = Timer.scheduledTimer(withTimeInterval: 0.5, repeats: true) { [weak self] _ in
+        timerManager.startStabilizationCheck { [weak self] in
             self?.checkStabilization()
         }
     }
@@ -819,8 +974,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         if elapsed >= stabilizationDelay {
             // True stabilization achieved
-            stabilizationCheckTimer?.invalidate()
-            stabilizationCheckTimer = nil
+            timerManager.stopStabilizationCheck()
             
             isDisplayMonitoringEnabled = true
             eventOccurredAfterStabilization = false
@@ -830,11 +984,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             debugPrint("⏳ Waiting for next display event (max 3s)")
             
             // Setup fallback (after 3 seconds)
-            let fallback = DispatchWorkItem { [weak self] in
+            timerManager.scheduleFallback(delay: 3.0) { [weak self] in
                 self?.fallbackRestoration()
             }
-            fallbackTimer = fallback
-            DispatchQueue.main.asyncAfter(deadline: .now() + 3.0, execute: fallback)
         }
     }
     
@@ -852,8 +1004,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     
     /// Trigger restoration process
     private func triggerRestoration(isRetry: Bool = false) {
-        // Cancel existing timer
-        restoreWorkItem?.cancel()
+        // Cancel existing restore task
+        timerManager.cancelRestore()
         
         // Reset retry counter when starting a new restore sequence
         if !isRetry {
@@ -865,7 +1017,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         debugPrint("Waiting \(String(format: "%.1f", totalDelay))s before restore") 
         
-        let workItem = DispatchWorkItem { [weak self] in
+        timerManager.scheduleRestore(delay: totalDelay) { [weak self] in
             guard let self = self else { return }
             
             let restoredCount = self.restoreWindowsIfNeeded()
@@ -879,7 +1031,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 self.restoreRetryCount += 1
                 debugPrint("🔄 Scheduling restore retry (\(self.restoreRetryCount)/\(self.maxRestoreRetries)): in \(String(format: "%.1f", self.restoreRetryDelay))s") 
                 
-                // Schedule retry
+                // Schedule retry (not using TimerManager - this is business logic specific retry)
                 DispatchQueue.main.asyncAfter(deadline: .now() + self.restoreRetryDelay) { [weak self] in
                     self?.triggerRestoration(isRetry: true)
                 }
@@ -888,18 +1040,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 debugPrint("⏭️ Skipping snapshot scheduling (restored: \(restoredCount), screens: \(NSScreen.screens.count))")
             }
         }
-        
-        restoreWorkItem = workItem
-        DispatchQueue.main.asyncAfter(deadline: .now() + totalDelay, execute: workItem)
     }
     
     /// Pause monitoring
     @objc private func pauseMonitoring() {
         isDisplayMonitoringEnabled = false
         lastDisplayChangeTime = nil
-        stabilizationCheckTimer?.invalidate()
-        stabilizationCheckTimer = nil
-        fallbackTimer?.cancel()
+        timerManager.stopStabilizationCheck()
+        timerManager.cancelFallback()
         eventOccurredAfterStabilization = false
         debugPrint("⏸️ Display monitoring paused")
     }
@@ -926,7 +1074,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     /// Start periodic monitoring for display memory
     private func startPeriodicSnapshot() {
         let interval = WindowTimingSettings.shared.displayMemoryInterval
-        snapshotTimer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] _ in
+        timerManager.startDisplayMemoryTimer(interval: interval) { [weak self] in
             self?.takeWindowSnapshot()
         }
         debugPrint("✅ Periodic monitoring started (\(Int(interval))s interval)")
@@ -1558,11 +1706,42 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
     
+    /// Setup hotkey settings change observer
+    private func setupHotkeySettingsObserver() {
+        NotificationCenter.default.addObserver(
+            forName: HotKeySettings.modifiersDidChangeNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.reregisterHotkeys()
+        }
+    }
+    
+    /// Re-register hotkeys after settings change
+    private func reregisterHotkeys() {
+        debugPrint("🔑 Hotkey modifiers changed, re-registering...")
+        
+        // Unregister existing hotkeys
+        unregisterHotKeys()
+        
+        // Register with new modifiers
+        let failedHotkeys = registerHotKeys()
+        
+        // Update menu to reflect new shortcuts
+        setupMenu()
+        
+        // Show warning if any registration failed
+        if !failedHotkeys.isEmpty {
+            showHotkeyRegistrationWarning(failedHotkeys: failedHotkeys)
+        } else {
+            debugPrint("🔑 All hotkeys re-registered successfully")
+        }
+    }
+    
     /// Restart display memory timer
     private func restartDisplayMemoryTimer() {
-        snapshotTimer?.invalidate()
         let interval = WindowTimingSettings.shared.displayMemoryInterval
-        snapshotTimer = Timer.scheduledTimer(withTimeInterval: interval, repeats: true) { [weak self] _ in
+        timerManager.restartDisplayMemoryTimer(interval: interval) { [weak self] in
             self?.takeWindowSnapshot()
         }
         debugPrint("🔄 Display memory interval changed(\(Int(interval))s interval)")
@@ -1570,7 +1749,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     
     /// Clear manual snapshots
     private func clearManualSnapshots() {
-        manualSnapshots = Array(repeating: [:], count: 5)
+        manualSnapshots = Array(repeating: [:], count: 6)
         debugPrint("🗑️ In-memory snapshot cleared")
     }
     
@@ -1581,12 +1760,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         debugPrint("⏱️ Initial auto-snapshot timer started: \(String(format: "%.1f", delaySeconds/60))min")
         
-        // Cancel existing timer
-        initialSnapshotTimer?.invalidate()
-        initialSnapshotTimer = nil
-        
-        // Add Timer to RunLoop in .common mode (works during UI operations)
-        let timer = Timer(timeInterval: delaySeconds, repeats: false) { [weak self] _ in
+        timerManager.scheduleInitialCapture(delay: delaySeconds) { [weak self] in
             debugPrint("⏱️ Initial auto-snapshot timer fired")
             self?.performAutoSnapshot(reason: "Initial auto")
             self?.hasInitialSnapshotBeenTaken = true
@@ -1597,8 +1771,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                 self?.startPeriodicSnapshotTimer()
             }
         }
-        RunLoop.main.add(timer, forMode: .common)
-        initialSnapshotTimer = timer
     }
     
     /// Start periodic snapshot timer
@@ -1614,25 +1786,17 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         debugPrint("⏱️ Periodic snapshot timer started: \(String(format: "%.0f", intervalSeconds/60))min interval")
         
-        // Cancel existing timer
-        periodicSnapshotTimer?.invalidate()
-        periodicSnapshotTimer = nil
-        
-        // Add Timer to RunLoop in .common mode (works during UI operations)
-        let timer = Timer(timeInterval: intervalSeconds, repeats: true) { [weak self] _ in
+        timerManager.startPeriodicCapture(interval: intervalSeconds) { [weak self] in
             debugPrint("⏱️ Periodic snapshot timer fired")
             self?.performAutoSnapshot(reason: "Periodic auto")
         }
-        RunLoop.main.add(timer, forMode: .common)
-        periodicSnapshotTimer = timer
     }
     
     /// Restart periodic snapshot timer (on settings change)
     private func restartPeriodicSnapshotTimerIfNeeded() {
         let settings = SnapshotSettings.shared
         
-        periodicSnapshotTimer?.invalidate()
-        periodicSnapshotTimer = nil
+        timerManager.stopPeriodicCapture()
         
         if settings.enablePeriodicSnapshot && hasInitialSnapshotBeenTaken {
             startPeriodicSnapshotTimer()
@@ -1710,16 +1874,17 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             }
         }
         
-        // Existing data protection check
+        // Existing data protection check (for auto slot only)
         let snapshotSettings = SnapshotSettings.shared
-        if snapshotSettings.protectExistingSnapshot && ManualSnapshotStorage.shared.hasSnapshot {
+        if snapshotSettings.protectExistingSnapshot && ManualSnapshotStorage.shared.hasSnapshot(for: 0) {
             if savedCount < snapshotSettings.minimumWindowCount {
                 debugPrint("🛡️ Data protection: window count is\(savedCount) (min:\(snapshotSettings.minimumWindowCount)), skipping overwrite")
                 return
             }
         }
         
-        manualSnapshots[currentSlotIndex] = snapshot
+        // Auto snapshot always saves to Slot 0 (reserved for auto)
+        manualSnapshots[0] = snapshot
         
         // Persist
         ManualSnapshotStorage.shared.save(manualSnapshots)
@@ -1744,29 +1909,25 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         debugPrint("⏱️ Post-display-connection snapshot: \(String(format: "%.1f", delaySeconds/60))min scheduled")
         
-        // Cancel existing initial timer and set new one
-        initialSnapshotTimer?.invalidate()
-        initialSnapshotTimer = nil
-        
-        // Add Timer to RunLoop in .common mode (works during UI operations)
-        let timer = Timer(timeInterval: delaySeconds, repeats: false) { [weak self] _ in
+        timerManager.scheduleInitialCapture(delay: delaySeconds) { [weak self] in
             debugPrint("⏱️ Post-display-connection snapshot timer fired")
             self?.performAutoSnapshot(reason: "Post-display auto")
             self?.hasInitialSnapshotBeenTaken = true
             
             // Start periodic snapshot if enabled and not yet started
             let snapshotSettings = SnapshotSettings.shared
-            if snapshotSettings.enablePeriodicSnapshot && self?.periodicSnapshotTimer == nil {
+            if snapshotSettings.enablePeriodicSnapshot && !(self?.timerManager.isPeriodicCaptureRunning ?? false) {
                 self?.startPeriodicSnapshotTimer()
             }
         }
-        RunLoop.main.add(timer, forMode: .common)
-        initialSnapshotTimer = timer
     }
     
     
     
     func applicationWillTerminate(_ notification: Notification) {
+        // Stop all timers first
+        timerManager.stopAllTimers()
+        
         // Clear snapshot on termination if privacy protection mode is enabled
         if SnapshotSettings.shared.disablePersistence {
             ManualSnapshotStorage.shared.clear()
@@ -1776,37 +1937,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     
     deinit {
         // Unregister hotkeys
-        if let hotKey = hotKeyRef {
-            UnregisterEventHotKey(hotKey)
-        }
-        if let hotKey = hotKeyRef2 {
-            UnregisterEventHotKey(hotKey)
-        }
-        if let hotKey = hotKeyRef3 {
-            UnregisterEventHotKey(hotKey)
-        }
-        if let hotKey = hotKeyRef4 {
-            UnregisterEventHotKey(hotKey)
-        }
-        if let hotKey = hotKeyRef5 {
-            UnregisterEventHotKey(hotKey)
-        }
-        if let hotKey = hotKeyRef6 {
-            UnregisterEventHotKey(hotKey)
-        }
-        if let hotKey = hotKeyRef7 {
-            UnregisterEventHotKey(hotKey)
-        }
-        if let hotKey = hotKeyRef8 {
-            UnregisterEventHotKey(hotKey)
-        }
+        unregisterHotKeys()
         if let handler = eventHandler {
             RemoveEventHandler(handler)
         }
-        // Stop timers
-        snapshotTimer?.invalidate()
-        initialSnapshotTimer?.invalidate()
-        periodicSnapshotTimer?.invalidate()
+        // Stop all timers
+        timerManager.stopAllTimers()
     }
 }
 

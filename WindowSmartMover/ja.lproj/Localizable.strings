@@ -36,17 +36,15 @@
 // MARK: - Settings View - General
 
 "Reset to Defaults" = "デフォルトに戻す";
-"⚠️ Some settings require restart" = "⚠️ 一部の設定は再起動が必要";
 
 // MARK: - Settings View - Language
 
 "Language" = "言語";
 "Display Language:" = "表示言語：";
 "System Default" = "システム設定に従う";
-"Restart Required" = "再起動が必要";
+"Requires app restart" = "再起動が必要";
+"🔄 Language change requires restart" = "🔄 言語変更には再起動が必要です";
 "Restart Now" = "今すぐ再起動";
-"Later" = "あとで";
-"Please restart the app to apply the language change." = "言語設定を反映するにはアプリを再起動してください。";
 
 // MARK: - Settings View - Shortcut Keys
 
@@ -136,3 +134,22 @@
 "Information" = "情報";
 "Developer" = "開発者";
 "License" = "ライセンス";
+
+
+// MARK: - Hotkey Registration Warning (#31)
+
+"Hotkey Registration Failed" = "ホットキーの登録に失敗";
+"The following shortcuts could not be registered:\n\n%@\n\nThis usually means another app is using the same shortcut. Check System Settings → Keyboard → Shortcuts, or try different modifier keys in Tsubame Settings." = "以下のショートカットを登録できませんでした:\n\n%@\n\n通常、他のアプリが同じショートカットを使用しています。システム設定 → キーボード → ショートカットを確認するか、Tsubameの設定で別の修飾キーをお試しください。";
+"Open Settings" = "設定を開く";
+"OK" = "OK";
+
+// MARK: - Snapshot Slots (#32)
+
+"🎯 Slot" = "🎯 スロット";
+"Slot %d" = "スロット %d";
+"empty" = "空";
+"%d windows @ %@" = "%d個 @ %@";
+"%d windows" = "%d個";
+"    💾 Slot %d: %d windows @ %@" = "    💾 スロット %d: %d個 @ %@";
+"    💾 Slot %d: %d windows" = "    💾 スロット %d: %d個";
+"    💾 Slot %d: No data" = "    💾 スロット %d: データなし";

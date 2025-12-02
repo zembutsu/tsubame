@@ -12,7 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - App Store release preparation
 - Binary distribution via GitHub Releases
 
-## [1.2.8] - WIP
+## [1.2.8] - 2025-12-02
 
 ### Added
 - **Internationalization (i18n)** (#2)
@@ -33,6 +33,28 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Replaces app names with generic identifiers (App1, App2, etc.)
   - Maintains consistency within session (same app = same identifier)
   - Users can safely share logs in GitHub issues without exposing app usage
+- **Hotkey Registration Failure Warning** (#31)
+  - Display alert dialog on startup if any hotkey registration fails
+  - Shows which shortcuts failed and suggests solutions
+  - "Open Settings" button for quick access to change modifier keys
+  - Helps users identify conflicts with other apps or system shortcuts
+- **Multiple Snapshot Slots** (#32)
+  - 5 manual snapshot slots for different scenarios (Home, Office, Presentation, etc.)
+  - Slot selection via menu bar submenu (🎯 Slot) or hotkeys (modifier + 1-5)
+  - Each slot shows window count and last update time (with date if not today)
+  - Sound feedback on slot switch (when sound is enabled)
+  - Auto-snapshot uses dedicated Slot 0 (internal, not shown in menu)
+  - Manual snapshots (modifier + ↑/↓) operate on the selected slot (1-5)
+  - Selected slot persists across app restarts
+  - Data structure designed for future Spaces/virtual desktop support
+  - Future: Custom slot naming (data structure ready, UI planned for v1.3.0+)
+
+### Improved
+- **Restart UX for Settings Changes** (#25)
+  - Hotkey modifier changes now take effect immediately (no restart required)
+  - Language changes still require restart, with clear visual indicator (🔄)
+  - "Restart Now" button appears only when language is changed
+  - Removed confusing static warning text and modal dialog
 
 ### Fixed
 - **Error logging for snapshot operations** (#29)
@@ -61,6 +83,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - Stored in UserDefaults (Keychain is overkill for local-only data)
   - Common app names (Safari, Finder, Chrome) can no longer be identified from stored hashes
 
+### Refactored
+- **Consolidated timer management into TimerManager class** (#28)
+  - Created new `TimerManager.swift` for centralized timer handling
+  - Moved 6 timers from AppDelegate to TimerManager:
+    - displayMemoryTimer (window position recording)
+    - initialCaptureTimer (initial snapshot after launch/connection)
+    - periodicCaptureTimer (periodic auto-snapshot)
+    - stabilizationCheckTimer (display change polling)
+    - restoreWorkItem (window restoration delay)
+    - fallbackWorkItem (post-stabilization fallback)
+  - Added `isCancelled` check for DispatchWorkItem to prevent duplicate execution
+  - Unified Timer creation pattern to `RunLoop.main.add(.common)`
+  - Removed unused `displayStabilizationTimer` variable
+  - Added `stopAllTimers()` call in `applicationWillTerminate` for clean shutdown
+  - Improved debuggability with `activeTimerNames` and `statusDescription` properties
+
 ### Technical Details
 - Implemented NSLocalizedString for all 80+ UI strings
 - Created ja.lproj/Localizable.strings for Japanese translations
@@ -74,10 +112,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Added `import Security` for `SecRandomCopyBytes`
 - Added guard statements for `positionRef` and `sizeRef` nil checks
 - CoreFoundation types require `as!` but are now protected by prior API success validation
+- Added `showHotkeyRegistrationWarning()` method with NSAlert
+- Modified `registerHotKeys()` to return list of failed registrations
+- Added `unregisterHotKeys()` for cleanup (preparation for #25)
+- Refactored hotkey registration from repetitive code to loop-based implementation
+- Added `HotKeySettings.modifiersDidChangeNotification` for immediate re-registration
+- Added `setupHotkeySettingsObserver()` in AppDelegate for hotkey change detection
+- TimerManager uses singleton pattern consistent with other Settings classes
+- Added `SnapshotSlot` struct with metadata dictionary for future extensibility
+- Storage format upgraded from V2 (array) to V3 (SnapshotSlot array) with automatic migration
+- `currentSlotIndex` now computed property backed by `ManualSnapshotStorage.activeSlotIndex`
+- Auto-snapshot hardcoded to Slot 0, manual operations use Slots 1-4
+- Menu bar slot submenu with radio-button style selection
+- Added hotkeys 9-13 for slot selection (modifier + 1-5)
+- Added `selectSlotByHotkey()` method for hotkey-triggered slot switching
+- Total registered hotkeys increased from 8 to 13
+- Slot switch plays sound feedback when sound notifications are enabled
+- Date display shows MM/dd HH:mm for non-today timestamps
 
 ### Migration Notes
 - Existing snapshots will not match after upgrade (different hash values)
 - Simply save a new snapshot after upgrading - no manual intervention needed
+- Snapshot data automatically migrates from V2 to V3 format on first launch
+- Existing single slot data moves to Slot 0 (auto); manual slots start empty
 
 
 ## [1.2.7] - 2025-11-29

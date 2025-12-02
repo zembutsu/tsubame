@@ -132,26 +132,73 @@ struct WindowMatchInfo: Codable, Equatable {
     }
 }
 
+// MARK: - Snapshot Slot Data Structure
+
+/// Snapshot slot with metadata for future extensibility (Spaces support, etc.)
+struct SnapshotSlot: Codable {
+    let id: UUID
+    var name: String?
+    var windows: [String: [String: WindowMatchInfo]]  // [DisplayID][WindowKey]
+    var createdAt: Date?
+    var updatedAt: Date?
+    var metadata: [String: String]  // Future: spaceID, displayConfig, etc.
+    
+    init(id: UUID = UUID(), name: String? = nil) {
+        self.id = id
+        self.name = name
+        self.windows = [:]
+        self.createdAt = nil
+        self.updatedAt = nil
+        self.metadata = [:]
+    }
+    
+    var windowCount: Int {
+        windows.values.reduce(0) { $0 + $1.count }
+    }
+    
+    var isEmpty: Bool {
+        windows.isEmpty || windows.values.allSatisfy { $0.isEmpty }
+    }
+}
+
 class HotKeySettings: ObservableObject {
     static let shared = HotKeySettings()
     
+    /// Notification posted when modifier keys change (hotkeys need re-registration)
+    static let modifiersDidChangeNotification = Notification.Name("HotKeyModifiersDidChange")
+    
     @Published var useControl: Bool {
-        didSet { UserDefaults.standard.set(useControl, forKey: "useControl") }
+        didSet {
+            UserDefaults.standard.set(useControl, forKey: "useControl")
+            notifyModifiersChanged()
+        }
     }
     @Published var useOption: Bool {
-        didSet { UserDefaults.standard.set(useOption, forKey: "useOption") }
+        didSet {
+            UserDefaults.standard.set(useOption, forKey: "useOption")
+            notifyModifiersChanged()
+        }
     }
     @Published var useShift: Bool {
-        didSet { UserDefaults.standard.set(useShift, forKey: "useShift") }
+        didSet {
+            UserDefaults.standard.set(useShift, forKey: "useShift")
+            notifyModifiersChanged()
+        }
     }
     @Published var useCommand: Bool {
-        didSet { UserDefaults.standard.set(useCommand, forKey: "useCommand") }
+        didSet {
+            UserDefaults.standard.set(useCommand, forKey: "useCommand")
+            notifyModifiersChanged()
+        }
     }
     
     /// Window nudge pixels (10-500, default 100)
     @Published var nudgePixels: Int {
         didSet { UserDefaults.standard.set(nudgePixels, forKey: "nudgePixels") }
     }
+    
+    /// Flag to prevent notification during initialization
+    private var isInitialized = false
     
     private init() {
         // Default: Option + Command
@@ -161,6 +208,13 @@ class HotKeySettings: ObservableObject {
         self.useCommand = UserDefaults.standard.object(forKey: "useCommand") as? Bool ?? true
         // Default: 100 pixels
         self.nudgePixels = UserDefaults.standard.object(forKey: "nudgePixels") as? Int ?? 100
+        
+        isInitialized = true
+    }
+    
+    private func notifyModifiersChanged() {
+        guard isInitialized else { return }
+        NotificationCenter.default.post(name: Self.modifiersDidChangeNotification, object: nil)
     }
     
     func getModifiers() -> UInt32 {
@@ -494,39 +548,100 @@ class SnapshotSettings: ObservableObject {
     }
 }
 
-// ManualSnapshotStorage: Snapshot persistence (privacy-protected version)
+// ManualSnapshotStorage: Snapshot persistence with multiple slots support
 class ManualSnapshotStorage {
     static let shared = ManualSnapshotStorage()
     
     private let defaults = UserDefaults.standard
-    private let storageKey = "manualSnapshotDataV2"  // Key for new format
-    private let timestampKey = "manualSnapshotTimestamp"
-    private let legacyStorageKey = "manualSnapshotData"  // Key for old format (for migration)
+    private let storageKeyV3 = "manualSnapshotDataV3"  // New SnapshotSlot format
+    private let storageKeyV2 = "manualSnapshotDataV2"  // Previous format (for migration)
+    private let timestampKey = "manualSnapshotTimestamp"  // Legacy, kept for compatibility
+    private let legacyStorageKey = "manualSnapshotData"  // Old format (for migration)
+    private let activeSlotKey = "activeSnapshotSlot"  // Currently selected slot (1-4)
+    
+    /// Number of slots (Slot 0 = auto, Slot 1-5 = manual)
+    let slotCount = 6
     
     private init() {
         // Remove legacy format data if exists
         if defaults.data(forKey: legacyStorageKey) != nil {
             defaults.removeObject(forKey: legacyStorageKey)
-            debugPrint("🔄 Removed legacy snapshot data (v1.3.0 migration)")
+            debugPrint("🔄 Removed legacy snapshot data (v1 migration)")
+        }
+        
+        // Migrate from V2 to V3 if needed
+        migrateV2ToV3IfNeeded()
+    }
+    
+    /// Migrate from V2 (array of dictionaries) to V3 (SnapshotSlot array)
+    private func migrateV2ToV3IfNeeded() {
+        guard let v2Data = defaults.data(forKey: storageKeyV2) else { return }
+        guard defaults.data(forKey: storageKeyV3) == nil else { return }  // Already migrated
+        
+        do {
+            let v2Snapshots = try JSONDecoder().decode([[String: [String: WindowMatchInfo]]].self, from: v2Data)
+            
+            // Convert to SnapshotSlot format
+            var slots: [SnapshotSlot] = []
+            for (index, windows) in v2Snapshots.enumerated() {
+                var slot = SnapshotSlot(name: index == 0 ? "Auto" : nil)
+                slot.windows = windows
+                if !windows.isEmpty {
+                    // Use legacy timestamp for first non-empty slot
+                    if let timestamp = defaults.object(forKey: timestampKey) as? Double {
+                        slot.updatedAt = Date(timeIntervalSince1970: timestamp)
+                    }
+                }
+                slots.append(slot)
+            }
+            
+            // Ensure we have exactly slotCount slots
+            while slots.count < slotCount {
+                slots.append(SnapshotSlot())
+            }
+            
+            // Save in V3 format
+            let v3Data = try JSONEncoder().encode(slots)
+            defaults.set(v3Data, forKey: storageKeyV3)
+            
+            // Remove V2 data after successful migration
+            defaults.removeObject(forKey: storageKeyV2)
+            defaults.removeObject(forKey: timestampKey)
+            
+            debugPrint("🔄 Migrated snapshot data from V2 to V3 (SnapshotSlot format)")
+        } catch {
+            debugPrint("❌ V2 to V3 migration failed: \(error.localizedDescription)")
         }
     }
     
-    /// Save snapshot (new format: WindowMatchInfo)
-    func save(_ snapshots: [[String: [String: WindowMatchInfo]]]) {
+    /// Get active slot index (1-4 for manual slots)
+    var activeSlotIndex: Int {
+        get {
+            let saved = defaults.integer(forKey: activeSlotKey)
+            // Ensure it's within valid range (1-4)
+            return (saved >= 1 && saved < slotCount) ? saved : 1
+        }
+        set {
+            // Ensure it's within valid range (1-4)
+            let validIndex = (newValue >= 1 && newValue < slotCount) ? newValue : 1
+            defaults.set(validIndex, forKey: activeSlotKey)
+        }
+    }
+    
+    /// Save all slots (SnapshotSlot format)
+    func saveSlots(_ slots: [SnapshotSlot]) {
         // Skip if persistence is disabled
         if SnapshotSettings.shared.disablePersistence {
             debugPrint("🔒 Persistence disabled: Snapshot not saved")
             return
         }
         
-        // WindowMatchInfo is directly Codable compatible
         do {
-            let data = try JSONEncoder().encode(snapshots)
-            defaults.set(data, forKey: storageKey)
-            defaults.set(Date().timeIntervalSince1970, forKey: timestampKey)
-            debugPrint("💾 Snapshot persisted (privacy-protected format)")
+            let data = try JSONEncoder().encode(slots)
+            defaults.set(data, forKey: storageKeyV3)
+            debugPrint("💾 Snapshot slots persisted (\(slots.count) slots)")
         } catch {
-            debugPrint("❌ Failed to encode snapshot: \(error.localizedDescription)")
+            debugPrint("❌ Failed to encode snapshot slots: \(error.localizedDescription)")
             sendErrorNotification(
                 title: NSLocalizedString("Snapshot Save Failed", comment: "Error notification title"),
                 body: String(format: NSLocalizedString("Failed to save snapshot data: %@", comment: "Error notification body"), error.localizedDescription)
@@ -534,38 +649,99 @@ class ManualSnapshotStorage {
         }
     }
     
-    /// Load snapshot (new format)
-    func load() -> [[String: [String: WindowMatchInfo]]]? {
-        guard let data = defaults.data(forKey: storageKey) else {
+    /// Load all slots (SnapshotSlot format)
+    func loadSlots() -> [SnapshotSlot]? {
+        guard let data = defaults.data(forKey: storageKeyV3) else {
             return nil
         }
         
         do {
-            let snapshots = try JSONDecoder().decode([[String: [String: WindowMatchInfo]]].self, from: data)
-            if let timestamp = defaults.object(forKey: timestampKey) as? Double {
-                let date = Date(timeIntervalSince1970: timestamp)
-                debugPrint("💾 Loaded saved snapshot (saved at: \(date))")
-            }
-            return snapshots
+            let slots = try JSONDecoder().decode([SnapshotSlot].self, from: data)
+            // Note: No log here as this method is called frequently (e.g., menu updates)
+            return slots
         } catch {
-            debugPrint("❌ Failed to decode snapshot: \(error.localizedDescription)")
+            debugPrint("❌ Failed to decode snapshot slots: \(error.localizedDescription)")
             return nil
         }
     }
     
-    /// Get save timestamp
+    /// Legacy save method (for backward compatibility during transition)
+    func save(_ snapshots: [[String: [String: WindowMatchInfo]]]) {
+        // Load existing slots to preserve timestamps
+        let existingSlots = loadSlots() ?? []
+        
+        var slots: [SnapshotSlot] = []
+        for (index, windows) in snapshots.enumerated() {
+            var slot: SnapshotSlot
+            
+            if index < existingSlots.count {
+                slot = existingSlots[index]
+                // Only update timestamp if windows data changed
+                let existingWindows = slot.windows
+                let windowsChanged = existingWindows != windows
+                
+                slot.windows = windows
+                if windowsChanged && !windows.isEmpty {
+                    slot.updatedAt = Date()
+                } else if windows.isEmpty {
+                    slot.updatedAt = nil
+                }
+            } else {
+                slot = SnapshotSlot(name: index == 0 ? "Auto" : nil)
+                slot.windows = windows
+                if !windows.isEmpty {
+                    slot.updatedAt = Date()
+                }
+            }
+            slots.append(slot)
+        }
+        
+        // Ensure we have exactly slotCount slots
+        while slots.count < slotCount {
+            slots.append(SnapshotSlot())
+        }
+        
+        saveSlots(slots)
+    }
+    
+    /// Legacy load method (for backward compatibility during transition)
+    func load() -> [[String: [String: WindowMatchInfo]]]? {
+        guard let slots = loadSlots() else { return nil }
+        return slots.map { $0.windows }
+    }
+    
+    /// Get timestamp for a specific slot
+    func getTimestamp(for slotIndex: Int) -> Date? {
+        guard let slots = loadSlots(), slotIndex < slots.count else { return nil }
+        return slots[slotIndex].updatedAt
+    }
+    
+    /// Legacy getTimestamp (returns active slot timestamp)
     func getTimestamp() -> Date? {
-        guard let timestamp = defaults.object(forKey: timestampKey) as? Double else {
-            return nil
-        }
-        return Date(timeIntervalSince1970: timestamp)
+        return getTimestamp(for: activeSlotIndex)
     }
     
-    /// Clear snapshot
+    /// Get slot info for display
+    func getSlotInfo(for slotIndex: Int) -> (windowCount: Int, updatedAt: Date?)? {
+        guard let slots = loadSlots(), slotIndex < slots.count else { return nil }
+        let slot = slots[slotIndex]
+        return (slot.windowCount, slot.updatedAt)
+    }
+    
+    /// Clear all snapshots
     func clear() {
-        defaults.removeObject(forKey: storageKey)
+        defaults.removeObject(forKey: storageKeyV3)
+        defaults.removeObject(forKey: storageKeyV2)
         defaults.removeObject(forKey: timestampKey)
         debugPrint("🗑️ Persisted snapshot cleared")
+    }
+    
+    /// Clear specific slot
+    func clearSlot(_ slotIndex: Int) {
+        guard var slots = loadSlots(), slotIndex < slots.count else { return }
+        slots[slotIndex] = SnapshotSlot()
+        saveSlots(slots)
+        debugPrint("🗑️ Slot \(slotIndex) cleared")
     }
     
     /// Send error notification to user
@@ -590,9 +766,22 @@ class ManualSnapshotStorage {
         }
     }
     
-    /// Check if snapshot exists
+    /// Check if any snapshot exists (excluding auto slot)
     var hasSnapshot: Bool {
-        return defaults.data(forKey: storageKey) != nil
+        guard let slots = loadSlots() else { return false }
+        // Check slots 1-4 (manual slots)
+        for i in 1..<slots.count {
+            if !slots[i].isEmpty {
+                return true
+            }
+        }
+        return false
+    }
+    
+    /// Check if specific slot has data
+    func hasSnapshot(for slotIndex: Int) -> Bool {
+        guard let slots = loadSlots(), slotIndex < slots.count else { return false }
+        return !slots[slotIndex].isEmpty
     }
 }
 
@@ -603,7 +792,8 @@ struct SettingsView: View {
     @ObservedObject var languageSettings = LanguageSettings.shared
     @Environment(\.dismiss) var dismiss
     @State private var selectedTab = 0
-    @State private var showRestartAlert = false
+    @State private var languageChanged = false
+    @State private var initialLanguage: AppLanguage = .system
     
     var body: some View {
         VStack(spacing: 16) {
@@ -638,11 +828,20 @@ struct SettingsView: View {
                 
                 Spacer()
                 
-                Text(NSLocalizedString("⚠️ Some settings require restart", comment: "Restart warning"))
-                    .font(.caption)
-                    .foregroundColor(.orange)
-                
-                Spacer()
+                if languageChanged {
+                    HStack(spacing: 8) {
+                        Text(NSLocalizedString("🔄 Language change requires restart", comment: "Restart warning for language"))
+                            .font(.caption)
+                            .foregroundColor(.orange)
+                        
+                        Button(NSLocalizedString("Restart Now", comment: "Button to restart app")) {
+                            restartApp()
+                        }
+                        .controlSize(.small)
+                    }
+                    
+                    Spacer()
+                }
                 
                 Button(NSLocalizedString("Close", comment: "Button to close window")) {
                     dismiss()
@@ -654,13 +853,8 @@ struct SettingsView: View {
         }
         .padding()
         .frame(width: 520, height: 620)
-        .alert(NSLocalizedString("Restart Required", comment: "Alert title"), isPresented: $showRestartAlert) {
-            Button(NSLocalizedString("Restart Now", comment: "Alert button")) {
-                restartApp()
-            }
-            Button(NSLocalizedString("Later", comment: "Alert button"), role: .cancel) {}
-        } message: {
-            Text(NSLocalizedString("Please restart the app to apply the language change.", comment: "Alert message"))
+        .onAppear {
+            initialLanguage = languageSettings.selectedLanguage
         }
     }
     
@@ -668,8 +862,12 @@ struct SettingsView: View {
     
     private var basicSettingsContent: some View {
         VStack(spacing: 16) {
-            // Language
-            GroupBox(label: Text(NSLocalizedString("Language", comment: "")).font(.headline)) {
+            // Language (requires restart)
+            GroupBox(label: HStack {
+                Text(NSLocalizedString("Language", comment: ""))
+                Text("🔄")
+                    .help(NSLocalizedString("Requires app restart", comment: "Tooltip for restart required"))
+            }.font(.headline)) {
                 HStack {
                     Picker(NSLocalizedString("Display Language:", comment: ""), selection: $languageSettings.selectedLanguage) {
                         ForEach(AppLanguage.allCases, id: \.self) { language in
@@ -678,7 +876,7 @@ struct SettingsView: View {
                     }
                     .pickerStyle(.menu)
                     .onChange(of: languageSettings.selectedLanguage) { oldValue, newValue in
-                        showRestartAlert = true
+                        languageChanged = (newValue != initialLanguage)
                     }
                     
                     Spacer()
