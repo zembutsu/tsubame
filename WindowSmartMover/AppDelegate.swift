@@ -191,7 +191,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     // New format: using WindowMatchInfo (hashed for privacy protection)
     private var manualSnapshots: [[String: [String: WindowMatchInfo]]] = Array(repeating: [:], count: 6)
     
-    // Current slot index for manual operations (1-4, Slot 0 is reserved for auto-snapshot)
+    // Current slot index for manual operations (1-5, Slot 0 is reserved for auto-snapshot)
     private var currentSlotIndex: Int {
         get { ManualSnapshotStorage.shared.activeSlotIndex }
         set { ManualSnapshotStorage.shared.activeSlotIndex = newValue }
