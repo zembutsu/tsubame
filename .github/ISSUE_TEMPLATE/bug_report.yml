@@ -1,0 +1,100 @@
+name: Bug Report
+description: Report a bug or unexpected behavior
+title: "[Bug]: "
+labels: ["bug", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for taking the time to report a bug!
+        Please fill out the information below to help us investigate.
+
+  - type: input
+    id: version
+    attributes:
+      label: Tsubame Version
+      description: "Found in menu bar → About (e.g., v1.2.9 build 78)"
+      placeholder: "v1.2.9 (build 78)"
+    validations:
+      required: true
+
+  - type: input
+    id: macos
+    attributes:
+      label: macOS Version
+      description: "Found in  → About This Mac"
+      placeholder: "macOS 15.1 (Sequoia)"
+    validations:
+      required: true
+
+  - type: input
+    id: affected_app
+    attributes:
+      label: Affected Application
+      description: "Which app was active when the issue occurred?"
+      placeholder: "Google Chrome, Firefox, Finder, etc."
+    validations:
+      required: false
+
+  - type: textarea
+    id: description
+    attributes:
+      label: Bug Description
+      description: What happened? What did you expect to happen?
+      placeholder: |
+        What happened:
+        - Window move hotkey (⌃⌘→) didn't work with Chrome
+
+        Expected:
+        - Window should move to the next screen
+    validations:
+      required: true
+
+  - type: textarea
+    id: steps
+    attributes:
+      label: Steps to Reproduce
+      description: How can we reproduce the issue?
+      placeholder: |
+        1. Open Google Chrome
+        2. Focus on a Chrome window
+        3. Press ⌃⌘→
+        4. Window doesn't move, log shows "Failed to get focused window"
+    validations:
+      required: true
+
+  - type: textarea
+    id: debug_log
+    attributes:
+      label: Debug Log
+      description: |
+        Copy from: Menu bar → Debug Log → Copy
+        
+        **Privacy tip**: Enable "Mask app names" in Settings → Debug before copying if you don't want to share app names.
+      placeholder: |
+        [8:24:08] === Starting move to next screen ===
+        [8:24:08] Frontmost app: Google Chrome
+        [8:24:08] ❌ Failed to get focused window
+      render: text
+    validations:
+      required: false
+
+  - type: dropdown
+    id: display_count
+    attributes:
+      label: Display Configuration
+      description: How many displays are connected?
+      options:
+        - "1 display (built-in only)"
+        - "2 displays"
+        - "3+ displays"
+    validations:
+      required: true
+
+  - type: textarea
+    id: additional
+    attributes:
+      label: Additional Context
+      description: Any other information that might help (screenshots, display arrangement, etc.)
+    validations:
+      required: false
