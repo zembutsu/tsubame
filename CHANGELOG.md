@@ -12,7 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - App Store release preparation
 - Binary distribution via GitHub Releases
 
-## [1.2.9] - 2025-12-04
+## [1.2.9] - 2025-12-03
 
 ### Changed
 - **Default hotkey modifier** now correctly defaults to `⌃⌘` (Control+Command)
