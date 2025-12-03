@@ -755,28 +755,47 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         // Get window via Accessibility API
         let appRef = AXUIElementCreateApplication(frontApp.processIdentifier)
-        var windowRef: AnyObject?
-        let result = AXUIElementCopyAttributeValue(appRef, kAXFocusedWindowAttribute as CFString, &windowRef)
+        var axWindow: AXUIElement?
         
-        guard result == .success, let window = windowRef else {
-            debugPrint("❌ Failed to get focused window")
+        // Try focused window first
+        var windowRef: CFTypeRef?
+        var result = AXUIElementCopyAttributeValue(appRef, kAXFocusedWindowAttribute as CFString, &windowRef)
+        
+        if result == .success, windowRef != nil {
+            // Note: CoreFoundation type casts always succeed after API success check
+            axWindow = (windowRef as! AXUIElement)
+            verbosePrint("  ✓ Got focused window")
+        } else {
+            // Fallback: get first window from all windows
+            verbosePrint("  ⚠️ Focused window not available (result: \(result.rawValue)), trying fallback...")
+            var windowsRef: CFTypeRef?
+            result = AXUIElementCopyAttributeValue(appRef, kAXWindowsAttribute as CFString, &windowsRef)
+            
+            if result == .success, let windows = windowsRef as? [AXUIElement], !windows.isEmpty {
+                axWindow = windows[0]
+                verbosePrint("  ✓ Got window via fallback (first of \(windows.count) windows)")
+            }
+        }
+        
+        guard let axWindow = axWindow else {
+            debugPrint("❌ Failed to get focused window (no fallback available)")
             return
         }
         
         // Get current position
-        // Note: CoreFoundation type casts (AXUIElement, AXValue) always succeed after API success check
-        let axWindow = window as! AXUIElement
+        var positionRef: CFTypeRef?
+        let posResult = AXUIElementCopyAttributeValue(axWindow, kAXPositionAttribute as CFString, &positionRef)
         
-        var positionRef: AnyObject?
-        AXUIElementCopyAttributeValue(axWindow, kAXPositionAttribute as CFString, &positionRef)
-        
-        guard let positionValue = positionRef else {
-            debugPrint("❌ Failed to get window position")
+        guard posResult == .success, let positionValue = positionRef else {
+            debugPrint("❌ Failed to get window position (result: \(posResult.rawValue))")
             return
         }
         
         var position = CGPoint.zero
-        AXValueGetValue(positionValue as! AXValue, .cgPoint, &position)
+        guard AXValueGetValue(positionValue as! AXValue, .cgPoint, &position) else {
+            debugPrint("❌ Failed to extract position value from AXValue")
+            return
+        }
         
         // Calculate new position
         var newPosition = position
@@ -816,35 +835,62 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         // Get window via Accessibility API
         let appRef = AXUIElementCreateApplication(frontApp.processIdentifier)
-        var windowRef: AnyObject?
-        let result = AXUIElementCopyAttributeValue(appRef, kAXFocusedWindowAttribute as CFString, &windowRef)
+        var axWindow: AXUIElement?
         
-        guard result == .success, let window = windowRef else {
-            debugPrint("❌ Failed to get focused window")
+        // Try focused window first
+        var windowRef: CFTypeRef?
+        var result = AXUIElementCopyAttributeValue(appRef, kAXFocusedWindowAttribute as CFString, &windowRef)
+        
+        if result == .success, windowRef != nil {
+            // Note: CoreFoundation type casts always succeed after API success check
+            axWindow = (windowRef as! AXUIElement)
+            debugPrint("✅ Got focused window")
+        } else {
+            // Fallback: get first window from all windows
+            debugPrint("⚠️ Focused window not available (result: \(result.rawValue)), trying fallback...")
+            var windowsRef: CFTypeRef?
+            result = AXUIElementCopyAttributeValue(appRef, kAXWindowsAttribute as CFString, &windowsRef)
+            
+            if result == .success, let windows = windowsRef as? [AXUIElement], !windows.isEmpty {
+                axWindow = windows[0]
+                debugPrint("✅ Got window via fallback (first of \(windows.count) windows)")
+            }
+        }
+        
+        guard let axWindow = axWindow else {
+            debugPrint("❌ Failed to get focused window (no fallback available)")
             return
         }
         
-        debugPrint("✅ Got focused window")
-        
         // Get current position and size
-        // Note: CoreFoundation type casts always succeed after API success check
-        let axWindow = window as! AXUIElement
+        var positionRef: CFTypeRef?
+        var sizeRef: CFTypeRef?
         
-        var positionRef: AnyObject?
-        var sizeRef: AnyObject?
+        let posResult = AXUIElementCopyAttributeValue(axWindow, kAXPositionAttribute as CFString, &positionRef)
+        let sizeResult = AXUIElementCopyAttributeValue(axWindow, kAXSizeAttribute as CFString, &sizeRef)
         
-        AXUIElementCopyAttributeValue(axWindow, kAXPositionAttribute as CFString, &positionRef)
-        AXUIElementCopyAttributeValue(axWindow, kAXSizeAttribute as CFString, &sizeRef)
+        guard posResult == .success, let positionValue = positionRef else {
+            debugPrint("❌ Failed to get window position (result: \(posResult.rawValue))")
+            return
+        }
         
-        guard let positionValue = positionRef, let sizeValue = sizeRef else {
-            debugPrint("❌ Failed to get window position/size")
+        guard sizeResult == .success, let sizeValue = sizeRef else {
+            debugPrint("❌ Failed to get window size (result: \(sizeResult.rawValue))")
             return
         }
         
         var position = CGPoint.zero
         var size = CGSize.zero
-        AXValueGetValue(positionValue as! AXValue, .cgPoint, &position)
-        AXValueGetValue(sizeValue as! AXValue, .cgSize, &size)
+        
+        guard AXValueGetValue(positionValue as! AXValue, .cgPoint, &position) else {
+            debugPrint("❌ Failed to extract position value from AXValue")
+            return
+        }
+        
+        guard AXValueGetValue(sizeValue as! AXValue, .cgSize, &size) else {
+            debugPrint("❌ Failed to extract size value from AXValue")
+            return
+        }
         
         debugPrint("Current window position: \(position), size: \(size)")
         

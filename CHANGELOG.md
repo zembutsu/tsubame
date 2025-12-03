@@ -24,6 +24,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 - Slot index comment typo (1-4 → 1-5)
+- **Accessibility API regression from #27** (#40)
+  - Restored `CFTypeRef?` type for window reference variables
+  - Fixed window operations failing for Chrome and multi-process apps
+  - Added fallback to `kAXWindowsAttribute` when `kAXFocusedWindowAttribute` fails
+  - Added `AXValueGetValue` return value validation
+  - Affected functions: `nudgeWindow()`, `moveWindow()`
 
 ## [1.2.8] - 2025-12-02
 
