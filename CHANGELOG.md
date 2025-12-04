@@ -12,6 +12,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - App Store release preparation
 - Binary distribution via GitHub Releases
 
+## [1.2.10] - 2025-12-04 [WIP]
+
+### Removed
+- **Dead code cleanup** (#45)
+  - `getAdjustedDisplayDelay()`: Displayed in UI but never used in actual restore logic
+  - `sleepDurationHours` and `lastWakeTime` properties: Only used for above calculation
+  - `ResumeDisplayMonitoring` observer: No code posted this notification
+  - `resumeMonitoring()` method: Empty implementation (log only)
+  - `getWindowIdentifier()` method: Defined but never called
+  - Sleep Behavior UI section showing "Last sleep" and "Adjusted delay" (misleading info)
+
+### Changed
+- Sleep Behavior settings UI simplified to show only monitoring status (Active/Paused)
+
 ## [1.2.9] - 2025-12-03
 
 ### Changed

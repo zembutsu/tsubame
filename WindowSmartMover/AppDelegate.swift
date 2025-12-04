@@ -970,13 +970,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             name: NSNotification.Name("DisableDisplayMonitoring"),
             object: nil
         )
-        
-        NotificationCenter.default.addObserver(
-            self,
-            selector: #selector(resumeMonitoring),
-            name: NSNotification.Name("ResumeDisplayMonitoring"),
-            object: nil
-        )
     }
     
     /// Handle display configuration change
@@ -1098,11 +1091,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         debugPrint("⏸️ Display monitoring paused")
     }
     
-    /// Resume monitoring
-    @objc private func resumeMonitoring() {
-        debugPrint("⏱️ Waiting for display stabilization...")
-    }
-    
     /// Get display identifier
     private func getDisplayIdentifier(for screen: NSScreen) -> String {
         if let screenNumber = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? CGDirectDisplayID {
@@ -1110,11 +1098,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
         // Fallback: use screen frame
         return "\(Int(screen.frame.origin.x))_\(Int(screen.frame.origin.y))_\(Int(screen.frame.width))_\(Int(screen.frame.height))"
-    }
-    
-    /// Create window identifier
-    private func getWindowIdentifier(appName: String, windowID: CGWindowID) -> String {
-        return "\(appName)_\(windowID)"
     }
     
     /// Start periodic monitoring for display memory

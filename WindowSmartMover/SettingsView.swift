@@ -278,8 +278,6 @@ class WindowTimingSettings: ObservableObject {
     
     // Sleep monitoring related
     @Published var lastSleepTime: Date?
-    @Published var lastWakeTime: Date?
-    @Published var sleepDurationHours: Double = 0
     @Published var isMonitoringEnabled: Bool = true
     
     private var sleepObserver: NSObjectProtocol?
@@ -332,11 +330,10 @@ class WindowTimingSettings: ObservableObject {
     
     // Wake handling
     private func handleWake() {
-        lastWakeTime = Date()
         if let sleepTime = lastSleepTime {
             let duration = Date().timeIntervalSince(sleepTime)
-            sleepDurationHours = duration / 3600.0
-            print("☀️ System woke from sleep after \(String(format: "%.2f", sleepDurationHours)) hours")
+            let hours = duration / 3600.0
+            print("☀️ System woke from sleep after \(String(format: "%.2f", hours)) hours")
         }
         
         // If monitoring pause feature is enabled
@@ -345,30 +342,6 @@ class WindowTimingSettings: ObservableObject {
             print("   Monitoring will resume automatically after stabilization")
             // Note: Monitoring resume is handled automatically by stabilization logic (AppDelegate)
             // Do nothing here = leave it to display change event stabilization
-        }
-    }
-    
-    // Get dynamically adjusted wait time
-    func getAdjustedDisplayDelay() -> Double {
-        let baseDelay = displayStabilizationDelay
-        
-        // Determine additional wait time based on sleep duration
-        switch sleepDurationHours {
-        case 0..<0.5:
-            // Less than 30 min: no change
-            return baseDelay
-        case 0.5..<1.0:
-            // 30 min - 1 hour: +2s
-            return baseDelay + 2.0
-        case 1.0..<2.0:
-            // 1-2 hours: +5s
-            return baseDelay + 5.0
-        case 2.0..<4.0:
-            // 2-4 hours: +10s
-            return baseDelay + 10.0
-        default:
-            // 4+ hours: +15s
-            return baseDelay + 15.0
         }
     }
     
@@ -1201,30 +1174,14 @@ struct SettingsView: View {
                         .font(.caption)
                         .foregroundColor(.secondary)
                     
-                    if timingSettings.sleepDurationHours > 0 {
-                        Divider()
-                        
-                        HStack {
-                            Text(NSLocalizedString("Last sleep:", comment: ""))
-                                .font(.caption)
-                            Text(String(format: NSLocalizedString("%.1f hours", comment: ""), timingSettings.sleepDurationHours))
-                                .font(.caption)
-                                .foregroundColor(.blue)
-                            Spacer()
-                            Text(NSLocalizedString("Adjusted delay:", comment: ""))
-                                .font(.caption)
-                            Text(String(format: NSLocalizedString("%.1fs", comment: "seconds"), timingSettings.getAdjustedDisplayDelay()))
-                                .font(.caption)
-                                .foregroundColor(.green)
-                        }
-                        
-                        HStack {
-                            Text(NSLocalizedString("Monitoring status:", comment: ""))
-                                .font(.caption)
-                            Text(timingSettings.isMonitoringEnabled ? NSLocalizedString("Active", comment: "") : NSLocalizedString("Paused", comment: ""))
-                                .font(.caption)
-                                .foregroundColor(timingSettings.isMonitoringEnabled ? .green : .orange)
-                        }
+                    Divider()
+                    
+                    HStack {
+                        Text(NSLocalizedString("Monitoring status:", comment: ""))
+                            .font(.caption)
+                        Text(timingSettings.isMonitoringEnabled ? NSLocalizedString("Active", comment: "") : NSLocalizedString("Paused", comment: ""))
+                            .font(.caption)
+                            .foregroundColor(timingSettings.isMonitoringEnabled ? .green : .orange)
                     }
                 }
                 .padding(.vertical, 8)
