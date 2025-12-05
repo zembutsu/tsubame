@@ -214,6 +214,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private let maxRestoreRetries: Int = 2
     private let restoreRetryDelay: TimeInterval = 3.0
     
+    // Restore cooldown feature (prevents duplicate restore on rapid display events)
+    private var lastRestoreTime: Date?
+    private let restoreCooldown: TimeInterval = 5.0
+    
     func applicationDidFinishLaunching(_ notification: Notification) {
         // Set global reference
         globalAppDelegate = self
@@ -1043,6 +1047,13 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     
     /// Trigger restoration process
     private func triggerRestoration(isRetry: Bool = false) {
+        // Cooldown check (skip for retries)
+        if !isRetry, let lastRestore = lastRestoreTime,
+           Date().timeIntervalSince(lastRestore) < restoreCooldown {
+            debugPrint("⏳ Restore cooldown active, skipping")
+            return
+        }
+        
         // Cancel existing restore task
         timerManager.cancelRestore()
         
@@ -1060,6 +1071,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             guard let self = self else { return }
             
             let restoredCount = self.restoreWindowsIfNeeded()
+            
+            // Record restore time for cooldown
+            self.lastRestoreTime = Date()
             
             // If restore succeeded and 2+ screens
             if restoredCount > 0 && NSScreen.screens.count >= 2 {
