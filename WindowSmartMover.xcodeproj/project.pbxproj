@@ -22,7 +22,7 @@
 /* End PBXContainerItemProxy section */
 
 /* Begin PBXFileReference section */
-		A91593162EA31AD10079F482 /* WindowSmartMover.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = WindowSmartMover.app; sourceTree = BUILT_PRODUCTS_DIR; };
+		A91593162EA31AD10079F482 /* Tsubame.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = Tsubame.app; sourceTree = BUILT_PRODUCTS_DIR; };
 		A9B765E12EDACFC700C459F4 /* TsubameTests.xctest */ = {isa = PBXFileReference; explicitFileType = wrapper.cfbundle; includeInIndex = 0; path = TsubameTests.xctest; sourceTree = BUILT_PRODUCTS_DIR; };
 		A9B765EF2EDAD58000C459F4 /* WindowMatcher.swift */ = {isa = PBXFileReference; lastKnownFileType = sourcecode.swift; path = WindowMatcher.swift; sourceTree = "<group>"; };
 /* End PBXFileReference section */
@@ -88,7 +88,7 @@
 		A91593172EA31AD10079F482 /* Products */ = {
 			isa = PBXGroup;
 			children = (
-				A91593162EA31AD10079F482 /* WindowSmartMover.app */,
+				A91593162EA31AD10079F482 /* Tsubame.app */,
 				A9B765E12EDACFC700C459F4 /* TsubameTests.xctest */,
 			);
 			name = Products;
@@ -117,7 +117,7 @@
 			packageProductDependencies = (
 			);
 			productName = WindowSmartMover;
-			productReference = A91593162EA31AD10079F482 /* WindowSmartMover.app */;
+			productReference = A91593162EA31AD10079F482 /* Tsubame.app */;
 			productType = "com.apple.product-type.application";
 		};
 		A9B765E02EDACFC700C459F4 /* TsubameTests */ = {
@@ -409,7 +409,7 @@
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				MARKETING_VERSION = 1.2.10;
 				PRODUCT_BUNDLE_IDENTIFIER = jp.pocketstudio.zem.WindowSmartMover;
-				PRODUCT_NAME = "$(TARGET_NAME)";
+				PRODUCT_NAME = Tsubame;
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				REGISTER_APP_GROUPS = YES;
 				RUNTIME_EXCEPTION_ALLOW_DYLD_ENVIRONMENT_VARIABLES = NO;
@@ -462,7 +462,7 @@
 				MACOSX_DEPLOYMENT_TARGET = 14.0;
 				MARKETING_VERSION = 1.2.10;
 				PRODUCT_BUNDLE_IDENTIFIER = jp.pocketstudio.zem.WindowSmartMover;
-				PRODUCT_NAME = "$(TARGET_NAME)";
+				PRODUCT_NAME = Tsubame;
 				PROVISIONING_PROFILE_SPECIFIER = "";
 				REGISTER_APP_GROUPS = YES;
 				RUNTIME_EXCEPTION_ALLOW_DYLD_ENVIRONMENT_VARIABLES = NO;

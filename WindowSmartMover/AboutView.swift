@@ -27,11 +27,14 @@ struct AboutView: View {
     
     var body: some View {
         VStack(spacing: 16) {
-            // Icon
-            Image(systemName: "rectangle.2.swap")
-                .font(.system(size: 50))
-                .foregroundColor(.blue)
-                .padding(.top, 20)
+            // Logo
+            if let appIcon = NSImage(named: "AppIcon") {
+                Image(nsImage: appIcon)
+                    .resizable()
+                    .frame(width: 80, height: 80)
+                    .clipShape(RoundedRectangle(cornerRadius: 16))
+                    .padding(.top, 24)
+            }
             
             // App name
             VStack(spacing: 4) {
