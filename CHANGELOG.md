@@ -12,7 +12,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - App Store release preparation
 - Binary distribution via GitHub Releases
 
-## [1.2.10] - 2025-12-04 [WIP]
+## [1.2.10] - 2025-12-06 
 
 ### Removed
 - **Dead code cleanup** (#45)
@@ -23,8 +23,14 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
   - `getWindowIdentifier()` method: Defined but never called
   - Sleep Behavior UI section showing "Last sleep" and "Adjusted delay" (misleading info)
 
+### Fixed
+- **Double window restore when waking from long sleep** (#45)
+  - Added 5-second cooldown after restore completion to prevent duplicate restoration
+  - macOS fires display events immediately after restore, triggering unnecessary second restore
+  - Cooldown is bypassed for intentional retries (restore retry mechanism unaffected)
+
 ### Changed
-- Sleep Behavior settings UI simplified to show only monitoring status (Active/Paused)
+  - Sleep Behavior settings UI simplified to show only monitoring status (Active/Paused)
 
 ## [1.2.9] - 2025-12-03
 
