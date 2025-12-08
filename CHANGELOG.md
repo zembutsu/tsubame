@@ -7,14 +7,20 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-
 ### Planned: v1.3.0 (Stable Release)
-- App Store release preparation
-- Binary distribution via GitHub Releases
+- Stability improvements and bug fixes based on v1.2.x feedback
+- Documentation finalization
+
+### Planned: Future
+- App Store release (requires separate investigation - see #49)
 
 ## v1.2.11 [WIP]
 
 ### Added
+- **Launch at Login option** (#42)
+  - SMAppService-based implementation for modern macOS (13.0+)
+  - Toggle in Settings → Basic
+  - Essential UX for menu bar utilities
 - **Menu hotkey display improvements** (#48)
   - Display `⌃⌘1-5` shortcuts in Slot submenu items
   - Add "🔀 Nudge Window" submenu with `⌃⌘W/A/S/D` shortcuts
@@ -573,51 +579,3 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - Used Accessibility API for window manipulation
 - Implemented in Swift 5.x with SwiftUI for settings interface
 - Utilized Carbon API for global hotkey registration
-
-## [Planned Features]
-
-### Internationalization (i18n)
-Multi-language support to make the app accessible to international users.
-
-**Scope:**
-- **User-facing UI and messages** - Menu items, dialogs, buttons, settings, and all user-visible text
-- **Debug logs** - Translate to English for global accessibility
-
-**Current state:**
-- All UI text is in Japanese
-- Debug logs are currently in Japanese, which prevents non-Japanese speakers from independently troubleshooting issues
-
-**Implementation approach:**
-
-**Phase 1: English default (Priority)**
-1. Translate all UI strings to English
-   - Menu items
-   - Settings dialog
-   - Debug log viewer
-   - About window
-   - Alert messages
-2. Translate all debug logs to English
-   - This enables international users to troubleshoot issues independently
-   - Facilitates collaboration on bug reports
-   - Enables effective Stack Overflow/GitHub issue searches
-3. Translate code comments to English
-   - Improves code readability for international contributors
-   - Facilitates open-source collaboration
-   - Makes the codebase more maintainable globally
-4. Implement NSLocalizedString framework for all user-facing text
-   - Prepares infrastructure for future localizations
-
-**Phase 2: Japanese localization**
-1. Create Japanese .strings files
-2. Add language auto-detection based on system preferences
-3. Test both English and Japanese interfaces thoroughly
-
-**Phase 3: Additional languages (Future)**
-- Community contributions welcome
-- Consider: Chinese, Korean, Spanish, French, German
-
-**Rationale:**
-- English debug logs are essential for international troubleshooting
-- English as the default UI maximizes the global user base
-- Phased approach enables stable implementation without major refactoring
-- Separating UI localization from debug logging optimizes both developer and user experience

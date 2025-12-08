@@ -32,7 +32,7 @@ A lightweight macOS menu bar app for effortless window management across multipl
 ### Advanced Configuration (v1.2.0+)
 - **Two-Stage Display Reconnection**: Intelligent timing for reliable window restoration
   - Stage 1: Wait for display configuration to stabilize (0.5s default)
-  - Stage 2: Wait for macOS coordinate updates (2.5s default)
+  - Stage 2: Wait for macOS coordinate updates (6.0s default)
 - **Configurable Timing Settings**: Fine-tune both stages independently (0.1-10s range)
   - Adjust for slower/faster display hardware
   - Optimize for your specific multi-monitor setup
@@ -294,6 +294,23 @@ No sensitive information is logged or transmitted.
 
 ## Roadmap
 
+### In Development (v1.2.11)
+- [ ] Launch at Login option (#42)
+- [x] Menu hotkey display improvements (#48)
+- [x] Restored Sleep Behavior debug info in Settings (#48)
+- [x] Auto-snapshot skip during sleep fix (#48)
+- [x] App icon and README logo
+
+### Completed (v1.2.10)
+- [x] Dead code cleanup (#45)
+- [x] Fixed double window restore on wake (#45)
+- [x] Production binary distribution via GitHub Releases (#3)
+
+### Completed (v1.2.9)
+- [x] Fixed Accessibility API regression (#40)
+- [x] Default hotkey modifier fix (⌃⌘)
+- [x] Sound notifications disabled by default
+
 ### Completed (v1.2.8)
 - [x] Internationalization (English UI + Japanese localization) (#2)
 - [x] In-app language switcher
@@ -359,13 +376,14 @@ No sensitive information is logged or transmitted.
 - [x] Enhanced window position detection logic
 - [x] Debug log viewer with copy functionality
 
-### In Development (v1.3.0)
-- [ ] App Store release preparation
-- [ ] Binary distribution via GitHub Releases
+### Planned (v1.3.0 - Stable Release)
+- [ ] Stability improvements based on v1.2.x feedback
+- [ ] Documentation finalization
 
-### Future Considerations (Post v1.3.0)
+### Future Considerations
+- [ ] **App Store release** (#49) - Requires Sandbox/Accessibility API investigation
 - [ ] Custom slot naming UI
-- [ ] Spaces/virtual desktop auto-slot selection
+- [ ] Spaces/virtual desktop auto-slot selection (#37)
 - [ ] Snapshot management interface (list, rename, delete)
 - [ ] Support for more than 2 displays
 - [ ] Per-app window restoration rules
