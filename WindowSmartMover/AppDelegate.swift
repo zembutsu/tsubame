@@ -1861,6 +1861,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     
     /// Perform auto snapshot
     private func performAutoSnapshot(reason: String) {
+        // Skip if monitoring is disabled (e.g., during sleep)
+        guard WindowTimingSettings.shared.isMonitoringEnabled else {
+            debugPrint("📸 \(reason)snapshot skipped (monitoring disabled)")
+            return
+        }
+        
         debugPrint("📸 \(reason)snapshot in progress...")
         
         // Check display count

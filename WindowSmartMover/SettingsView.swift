@@ -278,7 +278,14 @@ class WindowTimingSettings: ObservableObject {
     
     // Sleep monitoring related
     @Published var lastSleepTime: Date?
+    @Published var lastWakeTime: Date?
     @Published var isMonitoringEnabled: Bool = true
+    
+    /// Sleep duration in hours (computed from lastSleepTime and lastWakeTime)
+    var sleepDurationHours: Double {
+        guard let sleep = lastSleepTime, let wake = lastWakeTime else { return 0 }
+        return wake.timeIntervalSince(sleep) / 3600.0
+    }
     
     private var sleepObserver: NSObjectProtocol?
     private var wakeObserver: NSObjectProtocol?
@@ -330,6 +337,8 @@ class WindowTimingSettings: ObservableObject {
     
     // Wake handling
     private func handleWake() {
+        lastWakeTime = Date()
+        
         if let sleepTime = lastSleepTime {
             let duration = Date().timeIntervalSince(sleepTime)
             let hours = duration / 3600.0
@@ -1182,6 +1191,27 @@ struct SettingsView: View {
                         Text(timingSettings.isMonitoringEnabled ? NSLocalizedString("Active", comment: "") : NSLocalizedString("Paused", comment: ""))
                             .font(.caption)
                             .foregroundColor(timingSettings.isMonitoringEnabled ? .green : .orange)
+                    }
+                    
+                    // Sleep debug info
+                    if timingSettings.sleepDurationHours > 0 {
+                        HStack {
+                            Text(NSLocalizedString("Last sleep:", comment: ""))
+                                .font(.caption)
+                            Text(String(format: NSLocalizedString("%.1f hours", comment: "hours with decimal"), timingSettings.sleepDurationHours))
+                                .font(.caption)
+                                .foregroundColor(.blue)
+                        }
+                    }
+                    
+                    if let wakeTime = timingSettings.lastWakeTime {
+                        HStack {
+                            Text(NSLocalizedString("Last wake:", comment: ""))
+                                .font(.caption)
+                            Text(wakeTime.formatted(date: .omitted, time: .shortened))
+                                .font(.caption)
+                                .foregroundColor(.blue)
+                        }
                     }
                 }
                 .padding(.vertical, 8)
