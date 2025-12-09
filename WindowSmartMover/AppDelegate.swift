@@ -1698,44 +1698,69 @@ class AppDelegate: NSObject, NSApplicationDelegate {
                     // Find matching window from all windows
                     var matchFound = false
                     for axWindow in windows {
-                        var currentPosRef: CFTypeRef?
-                        if AXUIElementCopyAttributeValue(axWindow, kAXPositionAttribute as CFString, &currentPosRef) == .success,
-                           let currentPosValue = currentPosRef {
-                            var currentPoint = CGPoint.zero
-                            // CoreFoundation type cast always succeeds after API success
-                            if AXValueGetValue(currentPosValue as! AXValue, .cgPoint, &currentPoint) {
-                                // Check if current position matches current window position
-                                if abs(currentPoint.x - currentFrame.origin.x) < 50 &&
-                                   abs(currentPoint.y - currentFrame.origin.y) < 50 {
-                                    // Move to saved coordinates
-                                    var position = CGPoint(x: savedFrame.origin.x, y: savedFrame.origin.y)
-                                    if let positionValue = AXValueCreate(.cgPoint, &position) {
-                                        let posResult = AXUIElementSetAttributeValue(axWindow, kAXPositionAttribute as CFString, positionValue)
-                                        
-                                        // Also restore size
-                                        var size = CGSize(width: savedFrame.width, height: savedFrame.height)
-                                        var sizeRestored = false
-                                        if let sizeValue = AXValueCreate(.cgSize, &size) {
-                                            let sizeResult = AXUIElementSetAttributeValue(axWindow, kAXSizeAttribute as CFString, sizeValue)
-                                            sizeRestored = (sizeResult == .success)
-                                        }
-                                        
-                                        if posResult == .success {
-                                            restoredCount += 1
-                                            let sizeInfo = sizeRestored ? "+size" : ""
-                                            debugPrint("    ✅ \(DebugLogger.shared.maskAppName(ownerName)) restored to (\(Int(savedFrame.origin.x)), \(Int(savedFrame.origin.y)))\(sizeInfo)")
-                                        } else {
-                                            debugPrint("    ❌ \(DebugLogger.shared.maskAppName(ownerName)) move failed: \(posResult.rawValue)")
-                                        }
+                        var isMatch = false
+                        
+                        if isCGWindowIDMatch {
+                            // CGWindowID exact match: use size matching (more stable after wake)
+                            // Position can diverge between CGWindowList and AXUIElement after long sleep
+                            var axSizeRef: CFTypeRef?
+                            if AXUIElementCopyAttributeValue(axWindow, kAXSizeAttribute as CFString, &axSizeRef) == .success,
+                               let axSizeValue = axSizeRef {
+                                var axSize = CGSize.zero
+                                if AXValueGetValue(axSizeValue as! AXValue, .cgSize, &axSize) {
+                                    // Size tolerance: 10px (size is more stable than position)
+                                    if abs(axSize.width - currentFrame.width) < 10 &&
+                                       abs(axSize.height - currentFrame.height) < 10 {
+                                        isMatch = true
                                     }
-                                    matchFound = true
-                                    break
+                                }
+                            }
+                        } else {
+                            // Fallback: position matching for non-CGWindowID cases
+                            var currentPosRef: CFTypeRef?
+                            if AXUIElementCopyAttributeValue(axWindow, kAXPositionAttribute as CFString, &currentPosRef) == .success,
+                               let currentPosValue = currentPosRef {
+                                var currentPoint = CGPoint.zero
+                                if AXValueGetValue(currentPosValue as! AXValue, .cgPoint, &currentPoint) {
+                                    // Position tolerance: 50px
+                                    if abs(currentPoint.x - currentFrame.origin.x) < 50 &&
+                                       abs(currentPoint.y - currentFrame.origin.y) < 50 {
+                                        isMatch = true
+                                    }
                                 }
                             }
                         }
+                        
+                        if isMatch {
+                            // Move to saved coordinates
+                            var position = CGPoint(x: savedFrame.origin.x, y: savedFrame.origin.y)
+                            if let positionValue = AXValueCreate(.cgPoint, &position) {
+                                let posResult = AXUIElementSetAttributeValue(axWindow, kAXPositionAttribute as CFString, positionValue)
+                                
+                                // Also restore size
+                                var size = CGSize(width: savedFrame.width, height: savedFrame.height)
+                                var sizeRestored = false
+                                if let sizeValue = AXValueCreate(.cgSize, &size) {
+                                    let sizeResult = AXUIElementSetAttributeValue(axWindow, kAXSizeAttribute as CFString, sizeValue)
+                                    sizeRestored = (sizeResult == .success)
+                                }
+                                
+                                if posResult == .success {
+                                    restoredCount += 1
+                                    let sizeInfo = sizeRestored ? "+size" : ""
+                                    let matchType = isCGWindowIDMatch ? "size" : "pos"
+                                    debugPrint("    ✅ \(DebugLogger.shared.maskAppName(ownerName)) restored to (\(Int(savedFrame.origin.x)), \(Int(savedFrame.origin.y)))\(sizeInfo) [\(matchType)]")
+                                } else {
+                                    debugPrint("    ❌ \(DebugLogger.shared.maskAppName(ownerName)) move failed: \(posResult.rawValue)")
+                                }
+                            }
+                            matchFound = true
+                            break
+                        }
                     }
                     if !matchFound {
-                        verbosePrint("      ⚠️ AXUIElement position match failed - CGWindow pos: (\(Int(currentFrame.origin.x)), \(Int(currentFrame.origin.y)))")
+                        let matchType = isCGWindowIDMatch ? "size" : "position"
+                        verbosePrint("      ⚠️ AXUIElement \(matchType) match failed - CGWindow pos: (\(Int(currentFrame.origin.x)), \(Int(currentFrame.origin.y))), size: \(Int(currentFrame.width))x\(Int(currentFrame.height))")
                     }
                 }
             }
