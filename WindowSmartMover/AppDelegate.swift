@@ -1074,6 +1074,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             timerManager.stopStabilizationCheck()
             
             isDisplayMonitoringEnabled = true
+            WindowTimingSettings.shared.isMonitoringEnabled = true  // fix (#54) - Restore flag on wake
             eventOccurredAfterStabilization = false
             
             debugPrint("✅ Display stabilized (\(String(format: "%.1f", elapsed))s since last event)")
