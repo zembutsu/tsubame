@@ -15,7 +15,25 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Planned: Future
 - App Store release (requires separate investigation - see #49)
 
-## v1.2.11 - 2025-1212
+### Planned: v1.2.13
+- #47 Phase 2-4: Monitoring flag unification, snapshot data unification, code cleanup
+
+
+## v1.2.12 - 2025-1212 
+
+### Added
+- **Display sleep/wake handling** (#47 Phase 1)
+  - Added `screensDidSleepNotification` observer to pause monitoring when display sleeps
+  - Added `screensDidWakeNotification` observer to resume monitoring when display wakes
+  - Display sleep is separate from system sleep (e.g., 40min idle setting)
+
+### Fixed
+- **Backup restoration loop during display sleep** (#47 P1-1)
+  - Added `isDisplayMonitoringEnabled` guard to `takeWindowSnapshot()`
+  - Prevents repeated "Restoring backup" when display is off but system is running
+
+
+## [1.2.11] - 2025-1212
 
 ### Added
 - **Launch at Login option** (#42)

@@ -2,7 +2,6 @@ import Cocoa
 import Carbon
 import SwiftUI
 import UserNotifications
-import SystemConfiguration
 
 // Global variable to hold AppDelegate reference
 private var globalAppDelegate: AppDelegate?
@@ -1022,16 +1021,25 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             name: NSNotification.Name("DisableDisplayMonitoring"),
             object: nil
         )
+        
+        // Display sleep/wake notifications (separate from system sleep)
+        // Prevents snapshot corruption when display is off but system is running
+        NSWorkspace.shared.notificationCenter.addObserver(
+            self,
+            selector: #selector(handleScreensDidSleep),
+            name: NSWorkspace.screensDidSleepNotification,
+            object: nil
+        )
+        NSWorkspace.shared.notificationCenter.addObserver(
+            self,
+            selector: #selector(handleScreensDidWake),
+            name: NSWorkspace.screensDidWakeNotification,
+            object: nil
+        )
     }
     
     /// Handle display configuration change
     @objc private func displayConfigurationChanged() {
-        // Skip if user is not logged in (e.g., at login screen)
-        guard isUserLoggedIn() else {
-            verbosePrint("🖥️ Display change ignored - user not logged in")
-            return
-        }
-        
         let screenCount = NSScreen.screens.count
         debugPrint("🖥️ Display configuration changed")
         debugPrint("Current screen count: \(screenCount)")
@@ -1081,7 +1089,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             timerManager.stopStabilizationCheck()
             
             isDisplayMonitoringEnabled = true
-            WindowTimingSettings.shared.isMonitoringEnabled = true  // fix (#54) - Restore flag on wake
             eventOccurredAfterStabilization = false
             
             debugPrint("✅ Display stabilized (\(String(format: "%.1f", elapsed))s since last event)")
@@ -1167,6 +1174,19 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         debugPrint("⏸️ Display monitoring paused")
     }
     
+    /// Handle display sleep (separate from system sleep)
+    @objc private func handleScreensDidSleep() {
+        debugPrint("💤 Display going to sleep")
+        pauseMonitoring()
+    }
+    
+    /// Handle display wake (separate from system wake)
+    @objc private func handleScreensDidWake() {
+        debugPrint("☀️ Display woke up")
+        isDisplayMonitoringEnabled = true
+        debugPrint("▶️ Monitoring resumed after display wake")
+    }
+    
     /// Get display identifier
     private func getDisplayIdentifier(for screen: NSScreen) -> String {
         if let screenNumber = screen.deviceDescription[NSDeviceDescriptionKey("NSScreenNumber")] as? CGDirectDisplayID {
@@ -1174,17 +1194,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
         // Fallback: use screen frame
         return "\(Int(screen.frame.origin.x))_\(Int(screen.frame.origin.y))_\(Int(screen.frame.width))_\(Int(screen.frame.height))"
-    }
-    
-    /// Check if user is logged in (not at login screen)
-    /// Returns false when at login screen or when no console user
-    private func isUserLoggedIn() -> Bool {
-        var uid: uid_t = 0
-        guard let userName = SCDynamicStoreCopyConsoleUser(nil, &uid, nil) as String? else {
-            return false
-        }
-        // "loginwindow" means we're at the login screen
-        return !userName.isEmpty && userName != "loginwindow"
     }
     
     /// Start periodic monitoring for display memory
@@ -1198,10 +1207,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     
     /// Take snapshot of current window layout (for auto-restore)
     private func takeWindowSnapshot() {
-        // Skip if user is not logged in (e.g., at login screen)
-        // This prevents corrupting windowPositions with login screen display IDs
-        guard isUserLoggedIn() else {
-            verbosePrint("📸 Snapshot skipped - user not logged in")
+        // Skip if monitoring is paused (display sleep, system sleep, etc.)
+        guard isDisplayMonitoringEnabled else {
             return
         }
         
@@ -1614,12 +1621,6 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private func restoreWindowsIfNeeded() -> Int {
         debugPrint("🔄 Starting window restore process...")
         
-        // Skip if user is not logged in
-        guard isUserLoggedIn() else {
-            debugPrint("  ⏸️ Skipping restore - user not logged in")
-            return 0
-        }
-        
         let currentScreens = NSScreen.screens
         guard currentScreens.count >= 2 else {
             debugPrint("  Only one screen, skipping restore")
@@ -1630,44 +1631,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         let mainScreen = currentScreens[0]
         let mainScreenID = getDisplayIdentifier(for: mainScreen)
         
-        // Select data source: windowPositions (memory) or manualSnapshots[0] (persisted)
-        // Fallback to manualSnapshots[0] if windowPositions is empty (e.g., after app restart)
-        // TODO: Unify these two snapshot mechanisms in future refactoring (see issue #57)
-        let dataSource: [String: [String: WindowMatchInfo]]
-        let dataSourceName: String
-        
-        // Check if windowPositions has valid external display data
-        let windowPosExternalIDs = Set(windowPositions.keys).intersection(currentScreenIDs).subtracting([mainScreenID])
-        let hasWindowPositionsData = !windowPosExternalIDs.isEmpty &&
-            windowPosExternalIDs.contains { windowPositions[$0]?.isEmpty == false }
-        
-        if hasWindowPositionsData {
-            dataSource = windowPositions
-            dataSourceName = "memory"
-        } else {
-            // Fallback to persisted auto-snapshot (Slot 0)
-            dataSource = manualSnapshots[0]
-            dataSourceName = "persisted"
-            if !windowPositions.isEmpty {
-                verbosePrint("  ℹ️ windowPositions has no external display data, falling back to persisted snapshot")
-            } else {
-                verbosePrint("  ℹ️ windowPositions is empty (app restarted?), using persisted snapshot")
-            }
-        }
-        
         // Check which saved screen IDs are currently connected
-        let savedScreenIDs = Set(dataSource.keys)
-        
-        // Debug: show display ID comparison
-        verbosePrint("  📺 Current display IDs: \(currentScreenIDs.sorted().joined(separator: ", "))")
-        verbosePrint("  💾 Saved display IDs (\(dataSourceName)): \(savedScreenIDs.sorted().joined(separator: ", "))")
-        
-        // Find invalid display IDs (saved but not currently connected)
-        let invalidScreenIDs = savedScreenIDs.subtracting(currentScreenIDs)
-        if !invalidScreenIDs.isEmpty {
-            verbosePrint("  ⚠️ Unknown display IDs (skipping): \(invalidScreenIDs.sorted().joined(separator: ", "))")
-        }
-        
+        let savedScreenIDs = Set(windowPositions.keys)
         let externalScreenIDs = savedScreenIDs.intersection(currentScreenIDs).subtracting([mainScreenID])
         
         if externalScreenIDs.isEmpty {
@@ -1675,7 +1640,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             return 0
         }
         
-        debugPrint("  Target displays: \(externalScreenIDs.sorted().joined(separator: ", "))")
+        debugPrint("  Target displays: \(externalScreenIDs.joined(separator: ", "))")
         
         // Get current all windows
         let options = CGWindowListOption(arrayLiteral: .excludeDesktopElements, .optionOnScreenOnly)
@@ -1699,7 +1664,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         // Process each external display
         for externalScreenID in externalScreenIDs {
-            guard let savedWindows = dataSource[externalScreenID], !savedWindows.isEmpty else {
+            guard let savedWindows = windowPositions[externalScreenID], !savedWindows.isEmpty else {
                 continue
             }
             
