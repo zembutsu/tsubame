@@ -2,6 +2,7 @@ import Cocoa
 import Carbon
 import SwiftUI
 import UserNotifications
+import SystemConfiguration
 
 // Global variable to hold AppDelegate reference
 private var globalAppDelegate: AppDelegate?
@@ -1046,6 +1047,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     
     /// Handle display configuration change
     @objc private func displayConfigurationChanged() {
+        // Skip processing when user not logged in (login screen has phantom display IDs)
+        guard isUserLoggedIn() else {
+            debugPrint("🖥️ Display change ignored - user not logged in")
+            return
+        }
+        
         let screenCount = NSScreen.screens.count
         debugPrint("🖥️ Display configuration changed")
         debugPrint("Current screen count: \(screenCount)")
@@ -1180,6 +1187,18 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         debugPrint("⏸️ Display monitoring paused")
     }
     
+    /// Check if user is logged in (not at login screen)
+    /// Returns false when at login screen where display IDs may be phantom
+    private func isUserLoggedIn() -> Bool {
+        var uid: uid_t = 0
+        guard let userName = SCDynamicStoreCopyConsoleUser(nil, &uid, nil) as String?,
+              !userName.isEmpty,
+              userName != "loginwindow" else {
+            return false
+        }
+        return true
+    }
+    
     /// Handle system sleep
     @objc private func handleSystemSleep() {
         debugPrint("💤 System going to sleep")
@@ -1233,6 +1252,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private func takeWindowSnapshot() {
         // Skip if monitoring is paused (display sleep, system sleep, etc.)
         guard isMonitoringEnabled else {
+            return
+        }
+        
+        // Skip when user not logged in (login screen has phantom display IDs)
+        guard isUserLoggedIn() else {
+            verbosePrint("📸 Snapshot skipped - user not logged in")
             return
         }
         
@@ -1644,6 +1669,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     @discardableResult // Suppress warning when return value is unused
     private func restoreWindowsIfNeeded() -> Int {
         debugPrint("🔄 Starting window restore process...")
+        
+        // Skip when user not logged in (login screen has phantom display IDs)
+        guard isUserLoggedIn() else {
+            debugPrint("  ⏸️ Skipping restore - user not logged in")
+            return 0
+        }
         
         let currentScreens = NSScreen.screens
         guard currentScreens.count >= 2 else {
