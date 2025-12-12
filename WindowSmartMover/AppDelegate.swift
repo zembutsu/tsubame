@@ -1969,7 +1969,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     /// Perform auto snapshot
     private func performAutoSnapshot(reason: String) {
         // Skip if monitoring is disabled (e.g., during sleep)
-        guard WindowTimingSettings.shared.isMonitoringEnabled else {
+        guard isMonitoringEnabled else {
             debugPrint("📸 \(reason)snapshot skipped (monitoring disabled)")
             return
         }

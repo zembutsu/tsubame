@@ -276,20 +276,6 @@ class WindowTimingSettings: ObservableObject {
         }
     }
     
-    // Sleep monitoring related
-    @Published var lastSleepTime: Date?
-    @Published var lastWakeTime: Date?
-    @Published var isMonitoringEnabled: Bool = true
-    
-    /// Sleep duration in hours (computed from lastSleepTime and lastWakeTime)
-    var sleepDurationHours: Double {
-        guard let sleep = lastSleepTime, let wake = lastWakeTime else { return 0 }
-        return wake.timeIntervalSince(sleep) / 3600.0
-    }
-    
-    private var sleepObserver: NSObjectProtocol?
-    private var wakeObserver: NSObjectProtocol?
-    
     private init() {
         // Default: Post-display-connection wait time is 6.0s
         self.windowRestoreDelay = defaults.object(forKey: windowDelayKey) as? Double ?? 6.0
@@ -300,67 +286,7 @@ class WindowTimingSettings: ObservableObject {
         // Default: Display memory monitoring interval is 5.0s
         self.displayMemoryInterval = defaults.object(forKey: displayMemoryIntervalKey) as? Double ?? 5.0
         
-        // Start sleep monitoring
-        startSleepMonitoring()
-    }
-    
-    // Start sleep monitoring
-    private func startSleepMonitoring() {
-        sleepObserver = NSWorkspace.shared.notificationCenter.addObserver(
-            forName: NSWorkspace.willSleepNotification,
-            object: nil,
-            queue: .main
-        ) { [weak self] _ in
-            guard let self = self else { return }
-            self.lastSleepTime = Date()
-            print("💤 System going to sleep at \(Date())")
-            
-            // Pause display monitoring during sleep
-            if self.disableMonitoringDuringSleep {
-                self.isMonitoringEnabled = false
-                print("⏸️ Display monitoring disabled during sleep")
-                NotificationCenter.default.post(
-                    name: Notification.Name("DisableDisplayMonitoring"),
-                    object: nil
-                )
-            }
-        }
-        
-        wakeObserver = NSWorkspace.shared.notificationCenter.addObserver(
-            forName: NSWorkspace.didWakeNotification,
-            object: nil,
-            queue: .main
-        ) { [weak self] _ in
-            self?.handleWake()
-        }
-    }
-    
-    // Wake handling
-    private func handleWake() {
-        lastWakeTime = Date()
-        
-        if let sleepTime = lastSleepTime {
-            let duration = Date().timeIntervalSince(sleepTime)
-            let hours = duration / 3600.0
-            print("☀️ System woke from sleep after \(String(format: "%.2f", hours)) hours")
-        }
-        
-        // If monitoring pause feature is enabled
-        if disableMonitoringDuringSleep {
-            print("⏱️ Waiting for display stabilization...")
-            print("   Monitoring will resume automatically after stabilization")
-            // Note: Monitoring resume is handled automatically by stabilization logic (AppDelegate)
-            // Do nothing here = leave it to display change event stabilization
-        }
-    }
-    
-    deinit {
-        if let observer = sleepObserver {
-            NSWorkspace.shared.notificationCenter.removeObserver(observer)
-        }
-        if let observer = wakeObserver {
-            NSWorkspace.shared.notificationCenter.removeObserver(observer)
-        }
+        // Note: Sleep monitoring moved to AppDelegate (Phase 2 refactoring)
     }
 }
 
@@ -1182,37 +1108,6 @@ struct SettingsView: View {
                     Text(NSLocalizedString("Ignores display change events during sleep", comment: ""))
                         .font(.caption)
                         .foregroundColor(.secondary)
-                    
-                    Divider()
-                    
-                    HStack {
-                        Text(NSLocalizedString("Monitoring status:", comment: ""))
-                            .font(.caption)
-                        Text(timingSettings.isMonitoringEnabled ? NSLocalizedString("Active", comment: "") : NSLocalizedString("Paused", comment: ""))
-                            .font(.caption)
-                            .foregroundColor(timingSettings.isMonitoringEnabled ? .green : .orange)
-                    }
-                    
-                    // Sleep debug info
-                    if timingSettings.sleepDurationHours > 0 {
-                        HStack {
-                            Text(NSLocalizedString("Last sleep:", comment: ""))
-                                .font(.caption)
-                            Text(String(format: NSLocalizedString("%.1f hours", comment: "hours with decimal"), timingSettings.sleepDurationHours))
-                                .font(.caption)
-                                .foregroundColor(.blue)
-                        }
-                    }
-                    
-                    if let wakeTime = timingSettings.lastWakeTime {
-                        HStack {
-                            Text(NSLocalizedString("Last wake:", comment: ""))
-                                .font(.caption)
-                            Text(wakeTime.formatted(date: .omitted, time: .shortened))
-                                .font(.caption)
-                                .foregroundColor(.blue)
-                        }
-                    }
                 }
                 .padding(.vertical, 8)
             }
