@@ -19,7 +19,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - #47 Phase 2-4: Monitoring flag unification, snapshot data unification, code cleanup
 
 
-## v1.2.12 [WIP] 
+## v1.2.12 - 2025-1212 
 
 ### Added
 - **Display sleep/wake handling** (#47 Phase 1)
