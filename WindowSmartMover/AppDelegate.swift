@@ -1195,10 +1195,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     /// See: https://github.com/zembutsu/Tsubame/issues/66
     private func isUserLoggedIn() -> Bool {
         var uid: uid_t = 0
-        let userName = SCDynamicStoreCopyConsoleUser(nil, &uid, nil) as String?
-        let isLoggedIn = userName != nil && !userName!.isEmpty && userName != "loginwindow"
-        verbosePrint("🔐 Login check: user=\(userName ?? "nil"), uid=\(uid), result=\(isLoggedIn)")
-        if !isLoggedIn {
+        guard let userName = SCDynamicStoreCopyConsoleUser(nil, &uid, nil) as String?,
+              !userName.isEmpty,
+              userName != "loginwindow" else {
             return false
         }
         return true
@@ -1690,7 +1689,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         debugPrint("🔄 [\(trigger)] Starting window restore process...")
         
         // Skip when user not logged in (login screen has phantom display IDs)
-        guard isUserLoggedIn() else {
+        let loggedIn = isUserLoggedIn()
+        verbosePrint("🔐 Login check: result=\(loggedIn)")
+        guard loggedIn else {
             debugPrint("  ⏸️ Skipping restore - user not logged in")
             return 0
         }
