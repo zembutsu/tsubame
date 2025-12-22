@@ -14,6 +14,19 @@ A lightweight macOS menu bar app for effortless window management across multipl
 ![GitHub release](https://img.shields.io/github/v/release/zembutsu/tsubame)
 ![GitHub downloads](https://img.shields.io/github/downloads/zembutsu/tsubame/total)
 
+## Installation
+
+### Homebrew (Recommended)
+
+```bash
+brew tap zembutsu/tsubame
+brew install --cask tsubame
+```
+
+### Manual Download
+
+Download the latest release from [GitHub Releases](https://github.com/zembutsu/tsubame/releases).
+
 ## Features
 
 ### Core Functionality
@@ -138,6 +151,25 @@ A lightweight macOS menu bar app for effortless window management across multipl
 - **Enhanced Privacy**: App names masked in debug logs by default
   - Share logs safely without exposing your app usage
   - Toggle in Settings → Debug → "Mask app names"
+
+### Pause/Lock Feature (v1.2.14+)
+- **Temporary Function Disable**: For intentional display input switching
+  - Use case: KVM switches, projector input toggle, manual display reconnection
+  - Prevents chaotic window movement during display signal interruption
+  - `⌃⌘P` Toggle pause (always active, even when paused)
+- **Flexible Duration Options**:
+  - 15 minutes
+  - 1 hour
+  - 6 hours
+  - Until manual resume
+- **Visual Feedback**:
+  - Menu bar icon changes to pause indicator
+  - Menu shows remaining time and Resume option
+- **Configurable Behavior** (Settings → Advanced → Pause Behavior):
+  - Resume on app relaunch (default: ON)
+  - Resume on wake from sleep (default: OFF)
+
+> 💡 **Use Case**: When you manually switch your external display's input source (e.g., between Mac and PC), macOS detects this as a disconnect/reconnect event. Without Pause, Tsubame would trigger window restoration combined with macOS's own window relocation, causing chaotic movement. Pause lets you temporarily disable all Tsubame functions during such intentional switching.
 
 ### Coming Soon 🚧
 
@@ -294,8 +326,20 @@ No sensitive information is logged or transmitted.
 
 ## Roadmap
 
-### In Development (v1.2.11)
+### In Progress (v1.2.14)
 - [ ] Launch at Login option (#42)
+- [x] **Pause/Lock feature** (#70) - Temporarily disable all functions during display input switching
+- [x] **Homebrew tap distribution** - `brew install --cask zembutsu/tsubame/tsubame`
+- [x] Fixed Slot 0 auto-snapshot consistency (#64)
+
+### Completed (v1.2.13)
+- [x] Architecture refactoring (#47 Phase 2-4)
+- [x] Fixed AXUIElement position mismatch after long sleep (#50)
+- [x] Fixed monitoring flag not restored on wake (#54)
+- [x] Fixed phantom display IDs at login screen (#56)
+- [x] Project documentation (ARCHITECTURE.md, PROJECT.md)
+
+### Completed (v1.2.11)
 - [x] Menu hotkey display improvements (#48)
 - [x] Restored Sleep Behavior debug info in Settings (#48)
 - [x] Auto-snapshot skip during sleep fix (#48)

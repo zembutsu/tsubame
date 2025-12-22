@@ -449,7 +449,255 @@ class SnapshotSettings: ObservableObject {
     var initialDelaySeconds: Double {
         return initialSnapshotDelay * 60.0
     }
+}
+
+// MARK: - Pause Manager
+
+/// Pause duration options
+enum PauseDuration: CaseIterable {
+    case minutes15
+    case hour1
+    case hours6
+    case untilResume
     
+    var displayName: String {
+        switch self {
+        case .minutes15: return NSLocalizedString("15 minutes", comment: "Pause duration")
+        case .hour1: return NSLocalizedString("1 hour", comment: "Pause duration")
+        case .hours6: return NSLocalizedString("6 hours", comment: "Pause duration")
+        case .untilResume: return NSLocalizedString("Until Resume", comment: "Pause duration")
+        }
+    }
+    
+    var seconds: TimeInterval? {
+        switch self {
+        case .minutes15: return 15 * 60
+        case .hour1: return 60 * 60
+        case .hours6: return 6 * 60 * 60
+        case .untilResume: return nil  // Manual resume only
+        }
+    }
+}
+
+/// Manages pause state for Tsubame
+/// When paused, all hotkeys, auto-restore, and auto-snapshot are disabled
+class PauseManager: ObservableObject {
+    static let shared = PauseManager()
+    
+    /// Notification posted when pause state changes
+    static let pauseStateDidChangeNotification = Notification.Name("PauseStateDidChange")
+    
+    // MARK: - UserDefaults Keys
+    private let defaults = UserDefaults.standard
+    private let isPausedKey = "pauseIsPaused"
+    private let pauseUntilKey = "pausePauseUntil"
+    private let resumeOnWakeKey = "pauseResumeOnWake"
+    private let resumeOnRelaunchKey = "pauseResumeOnRelaunch"
+    
+    // MARK: - State
+    @Published private(set) var isPaused: Bool = false {
+        didSet { defaults.set(isPaused, forKey: isPausedKey) }
+    }
+    @Published private(set) var pauseUntil: Date? {
+        didSet { defaults.set(pauseUntil, forKey: pauseUntilKey) }
+    }
+    
+    // MARK: - Settings
+    /// Resume automatically when system wakes from sleep (default: false)
+    /// When false, pause continues until scheduled time expires
+    @Published var resumeOnWake: Bool {
+        didSet { defaults.set(resumeOnWake, forKey: resumeOnWakeKey) }
+    }
+    
+    /// Resume automatically when app relaunches (default: true)
+    /// When false, pause state persists across app restarts
+    @Published var resumeOnRelaunch: Bool {
+        didSet { defaults.set(resumeOnRelaunch, forKey: resumeOnRelaunchKey) }
+    }
+    
+    private var resumeTimer: Timer?
+    
+    private init() {
+        // Load settings
+        self.resumeOnWake = defaults.object(forKey: resumeOnWakeKey) as? Bool ?? false
+        self.resumeOnRelaunch = defaults.object(forKey: resumeOnRelaunchKey) as? Bool ?? true
+        
+        // Restore pause state
+        let savedIsPaused = defaults.bool(forKey: isPausedKey)
+        let savedPauseUntil = defaults.object(forKey: pauseUntilKey) as? Date
+        
+        if savedIsPaused {
+            if resumeOnRelaunch {
+                // Clear persisted state, start fresh
+                debugPrint("▶️ [PauseManager] Resumed on relaunch (setting enabled)")
+                defaults.set(false, forKey: isPausedKey)
+                defaults.removeObject(forKey: pauseUntilKey)
+                self.isPaused = false
+                self.pauseUntil = nil
+            } else {
+                // Restore paused state
+                self.isPaused = true
+                self.pauseUntil = savedPauseUntil
+                
+                // Check if timed pause has expired
+                if let until = savedPauseUntil, Date() >= until {
+                    debugPrint("▶️ [PauseManager] Timed pause expired during app restart")
+                    self.isPaused = false
+                    self.pauseUntil = nil
+                    defaults.set(false, forKey: isPausedKey)
+                    defaults.removeObject(forKey: pauseUntilKey)
+                } else {
+                    debugPrint("⏸️ [PauseManager] Restored paused state from previous session")
+                    // Restart timer if needed
+                    restartTimerIfNeeded()
+                }
+            }
+        }
+    }
+    
+    // MARK: - Public Methods
+    
+    /// Pause all Tsubame functions
+    /// - Parameter duration: Duration to pause, nil for indefinite
+    func pause(for duration: PauseDuration) {
+        isPaused = true
+        
+        // Cancel existing timer
+        resumeTimer?.invalidate()
+        resumeTimer = nil
+        
+        if let seconds = duration.seconds {
+            pauseUntil = Date().addingTimeInterval(seconds)
+            
+            // Schedule auto-resume
+            resumeTimer = Timer.scheduledTimer(withTimeInterval: seconds, repeats: false) { [weak self] _ in
+                self?.resume()
+            }
+            
+            let formatted = formatRemainingTime(seconds)
+            debugPrint("⏸️ [PauseManager] Paused for \(formatted)")
+        } else {
+            pauseUntil = nil
+            debugPrint("⏸️ [PauseManager] Paused until manual resume")
+        }
+        
+        notifyStateChange()
+    }
+    
+    /// Resume all Tsubame functions
+    func resume() {
+        guard isPaused else { return }
+        
+        isPaused = false
+        pauseUntil = nil
+        
+        resumeTimer?.invalidate()
+        resumeTimer = nil
+        
+        debugPrint("▶️ [PauseManager] Resumed")
+        notifyStateChange()
+    }
+    
+    /// Toggle pause state (for hotkey)
+    func toggle() {
+        if isPaused {
+            resume()
+        } else {
+            // Default: pause until manual resume
+            pause(for: .untilResume)
+        }
+    }
+    
+    /// Check if timed pause has expired (call on system wake)
+    /// Handles sleep/wake scenarios based on settings
+    func checkPauseExpiration() {
+        guard isPaused else { return }
+        
+        // If resumeOnWake is enabled, always resume
+        if resumeOnWake {
+            debugPrint("▶️ [PauseManager] Resumed on wake (setting enabled)")
+            resume()
+            return
+        }
+        
+        // Check if timed pause has expired
+        if let until = pauseUntil {
+            if Date() >= until {
+                let overrunMinutes = Int(Date().timeIntervalSince(until) / 60)
+                if overrunMinutes > 0 {
+                    debugPrint("▶️ [PauseManager] Timed pause expired \(overrunMinutes) min ago during sleep")
+                } else {
+                    debugPrint("▶️ [PauseManager] Timed pause expired")
+                }
+                resume()
+            } else {
+                // Still within pause period, restart timer for remaining time
+                restartTimerIfNeeded()
+                debugPrint("⏸️ [PauseManager] Pause continues, \(remainingTimeString ?? "unknown") remaining")
+            }
+        }
+        // If pauseUntil is nil (manual pause), keep paused
+    }
+    
+    // MARK: - Computed Properties
+    
+    /// Get remaining pause time as formatted string
+    var remainingTimeString: String? {
+        guard let until = pauseUntil else { return nil }
+        let remaining = until.timeIntervalSinceNow
+        guard remaining > 0 else { return nil }
+        return formatRemainingTime(remaining)
+    }
+    
+    /// Get status string for menu display
+    var statusString: String {
+        if !isPaused {
+            return NSLocalizedString("Active", comment: "Pause status")
+        }
+        
+        if let remaining = remainingTimeString {
+            return String(format: NSLocalizedString("Paused (%@)", comment: "Pause status with time"), remaining)
+        } else {
+            return NSLocalizedString("Paused", comment: "Pause status")
+        }
+    }
+    
+    // MARK: - Private Methods
+    
+    private func restartTimerIfNeeded() {
+        resumeTimer?.invalidate()
+        resumeTimer = nil
+        
+        guard let until = pauseUntil else { return }
+        let remaining = until.timeIntervalSinceNow
+        guard remaining > 0 else { return }
+        
+        resumeTimer = Timer.scheduledTimer(withTimeInterval: remaining, repeats: false) { [weak self] _ in
+            self?.resume()
+        }
+    }
+    
+    private func formatRemainingTime(_ seconds: TimeInterval) -> String {
+        let hours = Int(seconds) / 3600
+        let minutes = (Int(seconds) % 3600) / 60
+        
+        if hours > 0 {
+            return String(format: NSLocalizedString("%dh %dm", comment: "hours and minutes"), hours, minutes)
+        } else if minutes > 0 {
+            return String(format: NSLocalizedString("%dm", comment: "minutes"), minutes)
+        } else {
+            return NSLocalizedString("<1m", comment: "less than one minute")
+        }
+    }
+    
+    private func notifyStateChange() {
+        NotificationCenter.default.post(name: Self.pauseStateDidChangeNotification, object: nil)
+    }
+}
+
+// MARK: - Snapshot Settings Extensions
+
+extension SnapshotSettings {
     /// Get periodic interval in seconds
     var periodicIntervalSeconds: Double {
         return periodicSnapshotInterval * 60.0
@@ -698,6 +946,7 @@ struct SettingsView: View {
     @ObservedObject var timingSettings = WindowTimingSettings.shared
     @ObservedObject var snapshotSettings = SnapshotSettings.shared
     @ObservedObject var languageSettings = LanguageSettings.shared
+    @ObservedObject var pauseManager = PauseManager.shared
     @Environment(\.dismiss) var dismiss
     @State private var selectedTab = 0
     @State private var languageChanged = false
@@ -1111,6 +1360,42 @@ struct SettingsView: View {
                 }
                 .padding(.vertical, 8)
             }
+            
+            // Pause behavior
+            GroupBox(label: Text(NSLocalizedString("Pause Behavior", comment: "")).font(.headline)) {
+                VStack(alignment: .leading, spacing: 10) {
+                    Toggle(NSLocalizedString("Resume on app relaunch", comment: ""), isOn: $pauseManager.resumeOnRelaunch)
+                    
+                    Text(NSLocalizedString("When enabled, pause state is cleared when Tsubame restarts", comment: ""))
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    
+                    Divider()
+                    
+                    Toggle(NSLocalizedString("Resume on wake from sleep", comment: ""), isOn: $pauseManager.resumeOnWake)
+                    
+                    Text(NSLocalizedString("When enabled, pause is automatically cancelled when system wakes", comment: ""))
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                    
+                    // Current pause status
+                    if pauseManager.isPaused {
+                        Divider()
+                        HStack {
+                            Image(systemName: "pause.circle.fill")
+                                .foregroundColor(.orange)
+                            Text(pauseManager.statusString)
+                                .foregroundColor(.orange)
+                            Spacer()
+                            Button(NSLocalizedString("Resume Now", comment: "")) {
+                                pauseManager.resume()
+                            }
+                            .controlSize(.small)
+                        }
+                    }
+                }
+                .padding(.vertical, 8)
+            }
         }
         .padding(.horizontal)
     }
@@ -1149,6 +1434,8 @@ struct SettingsView: View {
         snapshotSettings.restoreOnLaunch = false
         snapshotSettings.showMilliseconds = false
         snapshotSettings.maskAppNamesInLog = true
+        pauseManager.resumeOnRelaunch = true
+        pauseManager.resumeOnWake = false
     }
     
     private func formatMinutes(_ minutes: Double) -> String {

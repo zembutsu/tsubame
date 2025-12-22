@@ -20,3 +20,5 @@ DerivedData/
 
 # Development session logs (internal)
 docs/logbook/S*.md
+docs/logbook/B*.md
+docs/logbook/A*.md

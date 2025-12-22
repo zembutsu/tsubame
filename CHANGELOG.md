@@ -14,6 +14,29 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Planned: Future
 - App Store release (requires separate investigation - see #49)
 
+## [1.2.14] - 2025-12-20
+
+### Added
+- **Pause/Lock feature** (#70)
+  - Temporarily disable all Tsubame functions during intentional display input switching
+  - Prevents chaotic window movement when using KVM switches or toggling display inputs
+  - Duration options: 15 minutes, 1 hour, 6 hours, or until manual resume
+  - Hotkey: `⌃⌘P` to toggle pause (always active, even when paused)
+  - Menu bar icon changes to pause indicator when paused
+  - Settings for pause behavior:
+    - Resume on app relaunch (default: ON)
+    - Resume on wake from sleep (default: OFF)
+  - Pause state persists across sleep/wake cycles
+- **Homebrew tap distribution**
+  - Install via `brew tap zembutsu/tsubame && brew install --cask tsubame`
+  - Official tap repository: [zembutsu/homebrew-tsubame](https://github.com/zembutsu/homebrew-tsubame)
+
+### Fixed
+- **Consistent use of Slot 0 for auto-snapshot** (#64)
+  - Auto-snapshot operations now correctly use Slot 0 (internal auto-snapshot slot)
+  - Previously some code paths incorrectly used `currentSlotIndex` instead of hardcoded `0`
+  - Ensures manual snapshot slots (1-5) are never overwritten by auto-snapshot
+
 ## [1.2.13] - 2025-12-14
 
 ### Changed
@@ -65,10 +88,6 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ## [1.2.11] - 2025-12-10
 
 ### Added
-- **Launch at Login option** (#42)
-  - SMAppService-based implementation for modern macOS (13.0+)
-  - Toggle in Settings → Basic
-  - Essential UX for menu bar utilities
 - **Menu hotkey display improvements** (#48)
   - Display `⌃⌘1-5` shortcuts in Slot submenu items
   - Add "🔀 Nudge Window" submenu with `⌃⌘W/A/S/D` shortcuts

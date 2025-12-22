@@ -23,6 +23,18 @@ private func hotKeyHandler(nextHandler: EventHandlerCallRef?, event: EventRef?, 
     print("🔥 Hotkey pressed: ID = \(hotKeyID.id)")
     
     DispatchQueue.main.async {
+        // Pause toggle hotkey (ID 14) is always active
+        if hotKeyID.id == 14 {
+            appDelegate.togglePause()
+            return
+        }
+        
+        // All other hotkeys are blocked when paused
+        if PauseManager.shared.isPaused {
+            print("⏸️ Hotkey ignored (paused)")
+            return
+        }
+        
         switch hotKeyID.id {
         case 1: // Right arrow (next screen)
             appDelegate.moveWindowToNextScreen()
@@ -176,6 +188,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     var hotKeyRef11: EventHotKeyRef? // Slot 3 (3)
     var hotKeyRef12: EventHotKeyRef? // Slot 4 (4)
     var hotKeyRef13: EventHotKeyRef? // Slot 5 (5)
+    var hotKeyRef14: EventHotKeyRef? // Pause toggle (P)
     var eventHandler: EventHandlerRef?
     var settingsWindow: NSWindow?
     var aboutWindow: NSWindow?
@@ -237,6 +250,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         debugPrint("========== Tsubame v\(version) (build \(build)) ==========")
         debugPrint("Settings:")
         debugPrint("  Hotkey: \(HotKeySettings.shared.getModifierString())")
+        debugPrint("  Pause toggle: \(HotKeySettings.shared.getModifierString())P")
         debugPrint("  Display stabilization: \(String(format: "%.1f", WindowTimingSettings.shared.displayStabilizationDelay))s")
         debugPrint("  Window restore delay: \(String(format: "%.1f", WindowTimingSettings.shared.windowRestoreDelay))s")
         debugPrint("  Restore on launch: \(SnapshotSettings.shared.restoreOnLaunch ? "ON" : "OFF")")
@@ -284,6 +298,9 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Setup hotkey settings observer
         setupHotkeySettingsObserver()
         
+        // Setup pause state observer
+        setupPauseStateObserver()
+        
         // Start periodic snapshot for display memory
         startPeriodicSnapshot()
         
@@ -306,8 +323,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Initialize lastScreenCount for cooldown logic
         lastScreenCount = NSScreen.screens.count
         
+        // Update menu bar icon based on pause state (in case paused state was restored)
+        updateMenuBarIcon()
+        
         debugPrint("Application launched")
         debugPrint("Connected screens: \(NSScreen.screens.count)")
+        debugPrint("Pause state: \(PauseManager.shared.isPaused ? "PAUSED" : "active")")
     }
     
     /// Setup notification center
@@ -428,6 +449,43 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         menu.addItem(snapshotStatusItem)
         
         menu.addItem(NSMenuItem.separator())
+        
+        // Pause submenu
+        let pauseManager = PauseManager.shared
+        
+        if pauseManager.isPaused {
+            // Show Resume option when paused
+            let resumeTitle = String(format: NSLocalizedString("▶️ Resume (%@P)", comment: "Resume menu item"), modifierString)
+            menu.addItem(NSMenuItem(title: resumeTitle, action: #selector(resumeFromMenu), keyEquivalent: ""))
+            
+            // Show pause status
+            let statusItem = NSMenuItem(title: "   " + pauseManager.statusString, action: nil, keyEquivalent: "")
+            statusItem.isEnabled = false
+            menu.addItem(statusItem)
+        } else {
+            // Show Pause submenu when active
+            let pauseMenuItem = NSMenuItem(title: NSLocalizedString("⏸️ Pause", comment: "Pause menu item"), action: nil, keyEquivalent: "")
+            let pauseSubmenu = NSMenu()
+            
+            // Add duration options
+            for duration in PauseDuration.allCases {
+                let item = NSMenuItem(title: duration.displayName, action: #selector(pauseForDuration(_:)), keyEquivalent: "")
+                item.representedObject = duration
+                pauseSubmenu.addItem(item)
+            }
+            
+            pauseSubmenu.addItem(NSMenuItem.separator())
+            
+            // Toggle shortcut hint
+            let hintItem = NSMenuItem(title: String(format: NSLocalizedString("Toggle: %@P", comment: "Pause toggle hint"), modifierString), action: nil, keyEquivalent: "")
+            hintItem.isEnabled = false
+            pauseSubmenu.addItem(hintItem)
+            
+            pauseMenuItem.submenu = pauseSubmenu
+            menu.addItem(pauseMenuItem)
+        }
+        
+        menu.addItem(NSMenuItem.separator())
         menu.addItem(NSMenuItem(title: NSLocalizedString("Settings...", comment: "Menu item to open settings"), action: #selector(openSettings), keyEquivalent: ","))
         menu.addItem(NSMenuItem(title: NSLocalizedString("Show Debug Log", comment: "Menu item to show debug log"), action: #selector(showDebugLog), keyEquivalent: "d"))
         menu.addItem(NSMenuItem.separator())
@@ -469,6 +527,58 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         
         // Update menu to reflect selection
         setupMenu()
+    }
+    
+    // MARK: - Pause Control
+    
+    /// Toggle pause state (called from hotkey)
+    func togglePause() {
+        PauseManager.shared.toggle()
+        updateMenuBarIcon()
+        setupMenu()
+        
+        // Play sound to confirm action
+        if SnapshotSettings.shared.enableSound {
+            NSSound(named: NSSound.Name(SnapshotSettings.shared.soundName))?.play()
+        }
+    }
+    
+    /// Resume from menu
+    @objc private func resumeFromMenu() {
+        PauseManager.shared.resume()
+        updateMenuBarIcon()
+        setupMenu()
+        
+        if SnapshotSettings.shared.enableSound {
+            NSSound(named: NSSound.Name(SnapshotSettings.shared.soundName))?.play()
+        }
+    }
+    
+    /// Pause for specified duration (from menu)
+    @objc private func pauseForDuration(_ sender: NSMenuItem) {
+        guard let duration = sender.representedObject as? PauseDuration else { return }
+        
+        PauseManager.shared.pause(for: duration)
+        updateMenuBarIcon()
+        setupMenu()
+        
+        if SnapshotSettings.shared.enableSound {
+            NSSound(named: NSSound.Name(SnapshotSettings.shared.soundName))?.play()
+        }
+    }
+    
+    /// Update menu bar icon based on pause state
+    private func updateMenuBarIcon() {
+        guard let button = statusItem?.button else { return }
+        
+        if PauseManager.shared.isPaused {
+            // Paused: show pause indicator
+            button.image = NSImage(systemSymbolName: "pause.rectangle", accessibilityDescription: "Tsubame (Paused)")
+        } else {
+            // Active: show normal icon
+            button.image = NSImage(systemSymbolName: "rectangle.2.swap", accessibilityDescription: "Window Mover")
+        }
+        button.image?.isTemplate = true
     }
     
     /// Generate slot status string for submenu
@@ -629,10 +739,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             HotKeyDef(keyCode: UInt32(kVK_ANSI_3), symbol: "3", description: "Select Slot 3", id: 11),
             HotKeyDef(keyCode: UInt32(kVK_ANSI_4), symbol: "4", description: "Select Slot 4", id: 12),
             HotKeyDef(keyCode: UInt32(kVK_ANSI_5), symbol: "5", description: "Select Slot 5", id: 13),
+            HotKeyDef(keyCode: UInt32(kVK_ANSI_P), symbol: "P", description: "Pause toggle", id: 14),
         ]
         
         // Array to store hotkey refs (index corresponds to id - 1)
-        var hotKeyRefs: [EventHotKeyRef?] = Array(repeating: nil, count: 13)
+        var hotKeyRefs: [EventHotKeyRef?] = Array(repeating: nil, count: 14)
         
         for def in hotKeyDefs {
             let hotKeyID = EventHotKeyID(signature: OSType(0x4D4F5645), id: def.id) // 'MOVE' + id
@@ -662,6 +773,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         hotKeyRef11 = hotKeyRefs[10]
         hotKeyRef12 = hotKeyRefs[11]
         hotKeyRef13 = hotKeyRefs[12]
+        hotKeyRef14 = hotKeyRefs[13]
         
         return failedHotkeys
     }
@@ -747,6 +859,10 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             UnregisterEventHotKey(hotKey)
             hotKeyRef13 = nil
         }
+        if let hotKey = hotKeyRef14 {
+            UnregisterEventHotKey(hotKey)
+            hotKeyRef14 = nil
+        }
         debugPrint("🔑 All hotkeys unregistered")
     }
     
@@ -772,6 +888,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     
     /// Nudge window (move by pixels in specified direction)
     func nudgeWindow(direction: NudgeDirection) {
+        // Skip if paused
+        if PauseManager.shared.isPaused {
+            debugPrint("📐 Nudge window skipped (paused)")
+            return
+        }
+        
         let pixels = HotKeySettings.shared.nudgePixels
         let directionName: String
         switch direction {
@@ -875,6 +997,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
     
     func moveWindow(direction: Direction) {
+        // Skip if paused
+        if PauseManager.shared.isPaused {
+            debugPrint("🔀 Move window skipped (paused)")
+            return
+        }
+        
         debugPrint("=== Starting move to \(direction == .next ? "next" : "previous") screen ===")
         
         // Get frontmost application
@@ -1055,6 +1183,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             return
         }
         
+        // Skip processing when paused (user intentionally switching display inputs)
+        if PauseManager.shared.isPaused {
+            debugPrint("🖥️ Display change ignored - paused")
+            return
+        }
+        
         let screenCount = NSScreen.screens.count
         debugPrint("🖥️ Display configuration changed")
         debugPrint("Current screen count: \(screenCount)")
@@ -1226,6 +1360,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     /// Handle system wake
     @objc private func handleSystemWake() {
         debugPrint("☀️ System woke from sleep")
+        // Check if timed pause has expired during sleep
+        PauseManager.shared.checkPauseExpiration()
         // Note: Monitoring resume is handled by display stabilization logic
         // (displayConfigurationChanged → checkStabilization)
         // Do not set isMonitoringEnabled = true here
@@ -1241,6 +1377,8 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     /// Handle display wake (separate from system wake)
     @objc private func handleScreensDidWake() {
         debugPrint("☀️ Display woke up")
+        // Check if timed pause has expired during display sleep
+        PauseManager.shared.checkPauseExpiration()
         isMonitoringEnabled = true
         debugPrint("▶️ Monitoring resumed after display wake")
     }
@@ -1269,6 +1407,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private func takeWindowSnapshot() {
         // Skip if monitoring is paused (display sleep, system sleep, etc.)
         guard isMonitoringEnabled else {
+            return
+        }
+        
+        // Skip if paused (user switching display inputs)
+        if PauseManager.shared.isPaused {
             return
         }
         
@@ -1365,6 +1508,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     
     /// Save manual snapshot
     @objc func saveManualSnapshot() {
+        // Skip if paused
+        if PauseManager.shared.isPaused {
+            debugPrint("📸 Manual snapshot skipped (paused)")
+            return
+        }
+        
         debugPrint("📸 Starting manual snapshot save (slot \(currentSlotIndex))")
         
         let options = CGWindowListOption(arrayLiteral: .excludeDesktopElements, .optionOnScreenOnly)
@@ -1448,6 +1597,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     
     /// Restore manual snapshot
     @objc func restoreManualSnapshot() {
+        // Skip if paused
+        if PauseManager.shared.isPaused {
+            debugPrint("📥 Manual restore skipped (paused)")
+            return
+        }
+        
         let modifierString = HotKeySettings.shared.getModifierString()
         debugPrint("📥 [Manual: \(modifierString)↓] Starting manual snapshot restore (slot \(currentSlotIndex))")
         
@@ -1688,6 +1843,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     private func restoreWindowsIfNeeded(trigger: String = "Auto") -> Int {
         debugPrint("🔄 [\(trigger)] Starting window restore process...")
         
+        // Skip if paused (user switching display inputs)
+        if PauseManager.shared.isPaused {
+            debugPrint("  ⏸️ Skipping restore - paused")
+            return 0
+        }
+        
         // Skip when user not logged in (login screen has phantom display IDs)
         let loggedIn = isUserLoggedIn()
         verbosePrint("🔐 Login check: result=\(loggedIn)")
@@ -1922,6 +2083,18 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         }
     }
     
+    /// Setup observer for pause state changes
+    private func setupPauseStateObserver() {
+        NotificationCenter.default.addObserver(
+            forName: PauseManager.pauseStateDidChangeNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            self?.updateMenuBarIcon()
+            self?.setupMenu()
+        }
+    }
+    
     /// Re-register hotkeys after settings change
     private func reregisterHotkeys() {
         debugPrint("🔑 Hotkey modifiers changed, re-registering...")
@@ -2015,6 +2188,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         // Skip if monitoring is disabled (e.g., during sleep)
         guard isMonitoringEnabled else {
             debugPrint("📸 \(reason)snapshot skipped (monitoring disabled)")
+            return
+        }
+        
+        // Skip if paused (user switching display inputs)
+        if PauseManager.shared.isPaused {
+            debugPrint("📸 \(reason)snapshot skipped (paused)")
             return
         }
         
