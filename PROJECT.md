@@ -9,6 +9,7 @@ This document is the entry point for developers and automated systems working on
 | **PROJECT.md** (this) | Developers, Systems | Project overview, principles, design philosophy |
 | README.md | Users | Installation, usage, features |
 | ARCHITECTURE.md | Developers, Systems | Technical structure, data flow, design decisions |
+| WORKFLOW.md | Developers, Systems | Session workflow, AI collaboration rules |
 | CHANGELOG.md | Everyone | Version history, changes |
 
 ## Project Vision
@@ -27,8 +28,8 @@ Tsubame is a macOS app that solves window position issues when connecting extern
 
 ## Current Status
 
-- **Version**: v1.2.13 (in development)
-- **Phase**: #47 Architecture Refactoring complete
+- **Version**: v1.4.0 (in development)
+- **Latest Release**: v1.3.0 (Apple notarized)
 
 ## Development Principles
 
@@ -46,7 +47,10 @@ Large changes are split into Phases:
 
 ### 3. System-Assisted Development
 
-(Policy to be documented in future)
+This project uses Bebop Style Development methodology:
+- Session-based development with clear handoff
+- AI assists with implementation, human approves
+- See WORKFLOW.md for details
 
 ## Roadmap
 
@@ -54,19 +58,27 @@ Large changes are split into Phases:
 - v1.2.11: Emergency fixes (#50, #54, #56 workarounds)
 - v1.2.12: Display sleep handling (Phase 1)
 - v1.2.13: Architecture refactoring (Phase 2-4)
+- v1.3.0: Stable release, Apple notarization, screen topology detection (#67)
+
+### In Progress
+- v1.4.0: Focus Follows Mouse (#72, PR #73 merged)
 
 ### Planned
-- v1.3.0: Stable release + UI improvements
-- Future: Additional features based on user feedback
+- #42: Launch at Login
+- #67: Screen topology detection
+- #68: Hotkey redesign for directional screen movement
+- #75: Display stabilization overlay indicator
+- #76: layoutSubtreeIfNeeded warning investigation
 
 ## For Automated Systems
 
 When working on this project:
 
-1. Read **ARCHITECTURE.md** to understand code structure
-2. Check **GitHub Issues** for current tasks and plans
-3. Propose large changes in Phase units
-4. Include design reasoning in commit messages
+1. Read **WORKFLOW.md** first for session procedures
+2. Read **ARCHITECTURE.md** to understand code structure
+3. Check **GitHub Issues** for current tasks and plans
+4. Propose large changes in Phase units
+5. Include design reasoning in commit messages
 
 ## Repository
 

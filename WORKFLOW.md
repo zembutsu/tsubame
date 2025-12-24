@@ -1,6 +1,6 @@
 # WORKFLOW.md - Bebop Style Development Session Guide
 
-> Version: 0.2.1 (S004で更新)
+> Version: 0.2.2 (S004で更新)
 > Purpose: 人間とAIのセッション開始/終了手順を明確化
 
 ---
@@ -243,6 +243,15 @@
 - 新しいData Flow追加時 → Data Flow更新
 - Known Issues発見時 → Known Issues / Technical Debt更新
 
+### PROJECT.md 更新タイミング
+
+**AIの責務**: セッション終了時に以下を確認し、必要に応じて更新する
+
+- バージョン番号が変わった時 → Current Status更新
+- リリースが完了した時 → Roadmap Completed更新
+- 新しいIssueが計画に入った時 → Roadmap Planned更新
+- 開発方針が変わった時 → Development Principles更新
+
 ### WORKFLOW.md 更新タイミング
 
 - プロセス改善提案があった時
@@ -292,8 +301,8 @@ Handoff Bridge確認しました。
 
 ## Document Information
 
-- Version: 0.2.1
+- Version: 0.2.2
 - Created: 2025-12-22 (S003)
-- Updated: 2025-12-24 (S004) - Language Policy追加、AIファイル確認チェック追加、ARCHITECTURE.md更新責務明記
+- Updated: 2025-12-24 (S004) - Language Policy追加、AIファイル確認チェック追加、ARCHITECTURE.md更新責務明記、PROJECT.md更新責務追加
 - Author: Claude (AI) with Zem
 - Next Review: S005 or after 3 sessions
