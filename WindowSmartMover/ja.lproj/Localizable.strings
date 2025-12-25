@@ -158,3 +158,10 @@
 "    💾 Slot %d: %d windows @ %@" = "    💾 スロット %d: %d個 @ %@";
 "    💾 Slot %d: %d windows" = "    💾 スロット %d: %d個";
 "    💾 Slot %d: No data" = "    💾 スロット %d: データなし";
+
+
+// MARK: Launch at login option (#42)
+
+"Startup" = "起動";
+"Launch Tsubame at login" = "ログイン時に Tsubame を起動";
+"Automatically start Tsubame when you log in to your Mac" = "Mac にログインしたときに Tsubame を自動的に起動します";
