@@ -7,7 +7,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
-### Planned: v1.4.0 (Focus Follows Mouse)
+### Planned: v1.4.0
+- **Launch at Login option** (#42)
+  - Add "Launch Tsubame at login" toggle in Settings → Basic
+  - Uses SMAppService (macOS 13+)
+  - Default: disabled
 - Focus Follows Mouse feature (#72)
   - X11-style auto-focus when mouse hovers over windows
   - Configurable delay: Instant (0ms) / Fast (150ms) / Standard (250ms) / Slow (500ms) / Custom
