@@ -5,6 +5,7 @@ import AppKit
 import CryptoKit
 import Security
 import UserNotifications
+import ServiceManagement
 
 // MARK: - Window Matching Data Structure
 
@@ -952,6 +953,7 @@ struct SettingsView: View {
     @State private var selectedTab = 0
     @State private var languageChanged = false
     @State private var initialLanguage: AppLanguage = .system
+    @State private var launchAtLogin: Bool = SMAppService.mainApp.status == .enabled
     
     var body: some View {
         VStack(spacing: 16) {
@@ -1020,11 +1022,40 @@ struct SettingsView: View {
     
     private var basicSettingsContent: some View {
         VStack(spacing: 16) {
+            // Launch at Login
+            GroupBox(label: HStack {
+                Text(NSLocalizedString("Startup", comment: "")).font(.headline)
+                Spacer()
+            }) {
+                VStack(alignment: .leading, spacing: 8) {
+                    Toggle(NSLocalizedString("Launch Tsubame at login", comment: ""), isOn: $launchAtLogin)
+                        .onChange(of: launchAtLogin) { oldValue, newValue in
+                            do {
+                                if newValue {
+                                    try SMAppService.mainApp.register()
+                                } else {
+                                    try SMAppService.mainApp.unregister()
+                                }
+                            } catch {
+                                // Revert on failure
+                                launchAtLogin = SMAppService.mainApp.status == .enabled
+                                debugPrint("❌ Launch at Login error: \(error.localizedDescription)")
+                            }
+                        }
+                    
+                    Text(NSLocalizedString("Automatically start Tsubame when you log in to your Mac", comment: ""))
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
+                .padding(.vertical, 8)
+            }
+            
             // Language (requires restart)
             GroupBox(label: HStack {
                 Text(NSLocalizedString("Language", comment: ""))
                 Text("🔄")
                     .help(NSLocalizedString("Requires app restart", comment: "Tooltip for restart required"))
+                Spacer()
             }.font(.headline)) {
                 HStack {
                     Picker(NSLocalizedString("Display Language:", comment: ""), selection: $languageSettings.selectedLanguage) {
@@ -1041,7 +1072,6 @@ struct SettingsView: View {
                 }
                 .padding(.vertical, 4)
             }
-            .padding(.horizontal)
             
             // Shortcut keys
             GroupBox(label: Text(NSLocalizedString("Shortcut Keys", comment: "")).font(.headline)) {
