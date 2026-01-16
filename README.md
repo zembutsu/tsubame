@@ -2,7 +2,7 @@
   <img src="./Assets/icon/tsubame_logo.png" width="200" alt="Tsubame Window Smart Mover Logo" />
 </p>
 
-# Tsubame - Window Smart Mover for macOS 
+# Tsubame - Window Smart Mover for macOS
 
 [English](README.md) | [日本語](README_ja.md)
 
@@ -16,6 +16,11 @@ A lightweight macOS menu bar app for effortless window management across multipl
 
 ## Installation
 
+### Requirements
+
+- macOS 14.0 or later
+- Accessibility permissions (required for window control)
+
 ### Homebrew (Recommended)
 
 ```bash
@@ -25,11 +30,28 @@ brew install --cask tsubame
 
 ### Manual Download
 
-Download the latest release from [GitHub Releases](https://github.com/zembutsu/tsubame/releases).
+1. Download the latest release from [Releases](https://github.com/zembutsu/tsubame/releases)
+2. Move `Tsubame.app` to `/Applications/`
+3. Launch the app
+4. Grant Accessibility permissions when prompted:
+   - System Settings → Privacy & Security → Accessibility
+   - Enable Tsubame
+
+### Build from Source
+
+To build from source in the terminal (code signing disabled):
+
+```bash
+git clone https://github.com/zembutsu/tsubame.git
+cd tsubame
+xcodebuild -project WindowSmartMover.xcodeproj -scheme WindowSmartMover -configuration Release -derivedDataPath build CODE_SIGNING_REQUIRED=NO CODE_SIGNING_ALLOWED=NO
+mv build/Build/Products/Release/Tsubame.app /Applications/
+```
 
 ## Features
 
 ### Core Functionality
+
 - **Keyboard Shortcuts**: Move windows between displays instantly
   - `⌃⌘→` Move to next display
   - `⌃⌘←` Move to previous display
@@ -37,12 +59,14 @@ Download the latest release from [GitHub Releases](https://github.com/zembutsu/t
 - **Menu Bar Integration**: Lightweight, stays out of your way
 
 ### Display Memory (v1.1+)
+
 - **Automatic Position Saving**: Remembers window positions periodically (configurable: 1-30 sec, default 5 sec)
 - **Smart Restoration**: Automatically restores windows when external displays reconnect
 - **Sleep/Wake Support**: Works seamlessly after waking from sleep
 - **Multi-Window Support**: Handles multiple windows per app individually
 
 ### Advanced Configuration (v1.2.0+)
+
 - **Two-Stage Display Reconnection**: Intelligent timing for reliable window restoration
   - Stage 1: Wait for display configuration to stabilize (0.5s default)
   - Stage 2: Wait for macOS coordinate updates (6.0s default)
@@ -52,6 +76,7 @@ Download the latest release from [GitHub Releases](https://github.com/zembutsu/t
   - Settings persist across app restarts
 
 ### Manual Snapshot (v1.2.3+)
+
 - **Save & Restore Window Layouts**: User-controlled window position memory
   - `⌃⌘↑` Save current window layout
   - `⌃⌘↓` Restore saved layout
@@ -61,6 +86,7 @@ Download the latest release from [GitHub Releases](https://github.com/zembutsu/t
   - Fullscreen/minimized windows excluded
 
 ### Multiple Snapshot Slots (v1.2.8+)
+
 - **5 Snapshot Slots**: Save different layouts for different scenarios
   - Home office setup
   - External monitor at work
@@ -69,14 +95,15 @@ Download the latest release from [GitHub Releases](https://github.com/zembutsu/t
 - **Quick Slot Switching**: Via menu or hotkeys
   - `⌃⌘1` through `⌃⌘5` to switch slots
   - Sound feedback when switching (if sound enabled)
-- **Smart Timestamp Display**: 
+- **Smart Timestamp Display**:
   - Shows time for today's saves
   - Shows date + time for older saves (MM/dd HH:mm)
 - **Auto-Snapshot Isolation**: Auto-snapshots use a dedicated internal slot (Slot 0), never overwriting your manual saves
 
-> 💡 **Design Note**: We evaluated three architectural approaches for multiple slots: (A) shared slots for auto/manual, (B) reserved Slot 0 for auto, manual slots 1-5, (C) remove auto-snapshot entirely. We chose **Option B** to preserve the proven auto-restoration logic while ensuring manual saves are never overwritten. The data structure includes a `metadata` dictionary for future extensibility (Spaces/virtual desktop support). — *Design Decision #32, 2025-12-02*
+> 💡 **Design Note**: We evaluated three architectural approaches for multiple slots: (A) shared slots for auto/manual, (B) reserved Slot 0 for auto, manual slots 1-5, (C) remove auto-snapshot entirely. We chose **Option B** to preserve the proven auto-restoration logic while ensuring manual saves are never overwritten. The data structure includes a `metadata` dictionary for future extensibility (Spaces/virtual desktop support). — _Design Decision #32, 2025-12-02_
 
 ### Auto Snapshot & Persistence (v1.2.4+)
+
 - **Automatic Snapshot**: Never forget to save your layout
   - Initial snapshot taken automatically after app launch (configurable: 0.5-60 min, default 15 min)
   - Also triggers after external display reconnection
@@ -90,6 +117,7 @@ Download the latest release from [GitHub Releases](https://github.com/zembutsu/t
   - Protects previous layout during system startup
 
 ### Window Nudge (v1.2.4+)
+
 - **Pixel-Perfect Positioning**: Fine-tune window position without mouse/trackpad
   - `⌃⌘W` Move up
   - `⌃⌘A` Move left
@@ -98,9 +126,10 @@ Download the latest release from [GitHub Releases](https://github.com/zembutsu/t
 - **Configurable Step Size**: 10-500 pixels (default 100 px)
 - **Keyboard-Only Workflow**: Complete window management without touching the trackpad
 
-> 💡 **Design Note**: This feature was inspired by "Tsubame" (燕/swallow) - the app's codename. The swift, agile movements of 燕返し (tsubame-gaeshi) suggested that window management should be equally nimble. Moving windows between screens is one thing, but fine-tuning their position should also be keyboard-driven. No more reaching for the trackpad just to nudge a window "a bit to the right." — *Zem, 2025-11-27*
+> 💡 **Design Note**: This feature was inspired by "Tsubame" (燕/swallow) - the app's codename. The swift, agile movements of 燕返し (tsubame-gaeshi) suggested that window management should be equally nimble. Moving windows between screens is one thing, but fine-tuning their position should also be keyboard-driven. No more reaching for the trackpad just to nudge a window "a bit to the right." — _Zem, 2025-11-27_
 
 ### Privacy & Security (v1.2.6+)
+
 - **Privacy-aware Snapshot Storage**: Your data is protected
   - App names and window titles are hashed (SHA256) before storage
   - Stored data reveals nothing about which apps you use or what content you view
@@ -117,6 +146,7 @@ Download the latest release from [GitHub Releases](https://github.com/zembutsu/t
   - Enable in Settings → Snapshot → "Don't persist snapshots"
 
 ### Enhanced Restoration (v1.2.7+)
+
 - **Window Size Restoration**: Complete layout restoration
   - Both position and size are now restored
   - Preserves your exact window dimensions
@@ -128,6 +158,7 @@ Download the latest release from [GitHub Releases](https://github.com/zembutsu/t
   - Enable in Settings → Debug → "Show milliseconds"
 
 ### Internationalization (v1.2.8+)
+
 - **Multi-language Support**: Use Tsubame in your preferred language
   - English as default UI language
   - Japanese localization included
@@ -141,6 +172,7 @@ Download the latest release from [GitHub Releases](https://github.com/zembutsu/t
   - Code comments also in English for contributors
 
 ### Improved User Experience (v1.2.8+)
+
 - **Hotkey Conflict Detection**: Know immediately if shortcuts fail to register
   - Alert dialog shows which shortcuts couldn't be registered
   - Suggests checking System Settings or trying different modifier keys
@@ -153,6 +185,7 @@ Download the latest release from [GitHub Releases](https://github.com/zembutsu/t
   - Toggle in Settings → Debug → "Mask app names"
 
 ### Pause/Lock Feature (v1.2.14+)
+
 - **Temporary Function Disable**: For intentional display input switching
   - Use case: KVM switches, projector input toggle, manual display reconnection
   - Prevents chaotic window movement during display signal interruption
@@ -172,6 +205,7 @@ Download the latest release from [GitHub Releases](https://github.com/zembutsu/t
 > 💡 **Use Case**: When you manually switch your external display's input source (e.g., between Mac and PC), macOS detects this as a disconnect/reconnect event. Without Pause, Tsubame would trigger window restoration combined with macOS's own window relocation, causing chaotic movement. Pause lets you temporarily disable all Tsubame functions during such intentional switching.
 
 ### Focus Follows Mouse (v1.4.0+)
+
 - **X11-Style Auto-Focus**: Windows automatically receive focus when the mouse hovers over them
   - No clicking required to switch between windows
   - Familiar behavior for X11/Linux users
@@ -194,7 +228,7 @@ Download the latest release from [GitHub Releases](https://github.com/zembutsu/t
 - **Enhanced Snapshot Features**:
   - Custom slot naming (data structure ready)
   - Snapshot management interface (list, rename, delete)
-- **Spaces/Virtual Desktop Support**: 
+- **Spaces/Virtual Desktop Support**:
   - Auto-select slot based on current Space (planned)
 
 For detailed development progress, see [CHANGELOG.md](CHANGELOG.md).
@@ -204,11 +238,13 @@ For detailed development progress, see [CHANGELOG.md](CHANGELOG.md).
 ### The Problem with Existing Solutions
 
 Most window management apps are either:
+
 - **Too heavy**: Packed with features you don't need
 - **Closed source**: You can't verify what they're doing
 - **Cloud-dependent**: Require accounts and subscriptions
 
 Tsubame is:
+
 - ✅ **Simple**: Does one thing well
 - ✅ **Open Source**: Full transparency
 - ✅ **Privacy-First**: Everything stays on your Mac
@@ -220,11 +256,13 @@ Tsubame is:
 While aware of competing solutions like Rectangle and Magnet, I deliberately chose to "reinvent the wheel" for several reasons:
 
 **Learning by Doing**
+
 - Deep understanding comes from implementation, not just usage
 - SwiftUI and macOS app development require hands-on experience
 - Building from scratch reveals architectural decisions and trade-offs
 
 **Right-Sized Solution**
+
 - Existing tools are feature-rich but over-specified for my needs
 - Sometimes a focused, minimal solution is more maintainable
 - Complete control over features and future direction
@@ -235,29 +273,16 @@ This project embodies the philosophy: **understand deeply by building yourself**
 
 "Tsubame" (燕) means "swallow" in Japanese - the bird known for its swift, agile flight. Just as swallows dart effortlessly between locations, this app helps your windows move seamlessly between displays. The name also references "燕返し" (tsubame-gaeshi), a sword technique famous for its quick reversal - fitting for an app that restores windows to their original positions.
 
-## Installation
-
-### Requirements
-- macOS 14.0 or later
-- Accessibility permissions (required for window control)
-
-### Download & Install
-
-1. Download the latest release from [Releases](https://github.com/zembutsu/tsubame/releases)
-2. Move `Tsubame.app` to `/Applications/`
-3. Launch the app
-4. Grant Accessibility permissions when prompted:
-   - System Settings → Privacy & Security → Accessibility
-   - Enable Tsubame
-
 ## Usage
 
 ### Basic Window Movement
+
 1. Make sure a window is active (click on it)
 2. Press `⌃⌘→` to move to the next display
 3. Press `⌃⌘←` to move to the previous display
 
 ### Automatic Window Restoration
+
 1. Use your external display normally
 2. When you disconnect (or sleep):
    - Windows automatically move to the main display
@@ -265,18 +290,21 @@ This project embodies the philosophy: **understand deeply by building yourself**
    - Windows automatically restore to their original positions
 
 ### Customizing Hotkeys
+
 1. Click the menu bar icon
 2. Select "Settings..."
 3. Choose your preferred modifier keys
 4. Restart the app
 
 ### Changing Language
+
 1. Click the menu bar icon
 2. Select "Settings..."
 3. In the "Language" section, select your preferred language
 4. Click "Restart Now" when prompted (or restart later)
 
 ### Configuring Display Reconnection Timing
+
 1. Click the menu bar icon
 2. Select "Settings..."
 3. Adjust timing settings:
@@ -284,6 +312,7 @@ This project embodies the philosophy: **understand deeply by building yourself**
    - **Window Restore Delay**: Additional delay before moving windows (0.1-10.0s)
 
 ### Manual Snapshot Usage
+
 1. Arrange your windows as desired on external display
 2. Press `⌃⌘↑` to save the layout (or use menu)
 3. Later, press `⌃⌘↓` to restore (or use menu)
@@ -295,16 +324,19 @@ This project embodies the philosophy: **understand deeply by building yourself**
 Default settings (12 second total delay) work for most users, but you can optimize:
 
 **For fast USB-C displays:**
+
 - Display stabilization: 2-3 seconds
 - Window restore delay: 3-4 seconds
 - Total: 5-7 seconds
 
 **For slower HDMI/DisplayPort:**
+
 - Display stabilization: 6-8 seconds
-- Window restore delay: 6-8 seconds  
+- Window restore delay: 6-8 seconds
 - Total: 12-16 seconds
 
 **If windows don't restore properly:**
+
 - Increase both values by 2-3 seconds
 - Check Debug Log for timing details
 - Report your hardware setup in issues
@@ -312,11 +344,13 @@ Default settings (12 second total delay) work for most users, but you can optimi
 ## Troubleshooting
 
 ### Windows not moving
+
 - Verify Accessibility permissions are granted
 - Try restarting the app
 - Some apps don't support programmatic window control
 
 ### Automatic restoration not working
+
 - Check debug logs: Menu bar icon → "Show Debug Log"
 - Ensure external display is properly detected
 - Try manual window movement first to verify permissions
@@ -326,13 +360,16 @@ Default settings (12 second total delay) work for most users, but you can optimi
   - Access via Menu bar → "Settings..." → Timing section
 
 ### Using Debug Logs
+
 The debug log viewer helps diagnose issues:
+
 1. Reproduce the problem
 2. Open debug logs (Menu bar → "Show Debug Log")
 3. Copy logs using the "Copy" button
 4. Share logs when reporting issues on GitHub
 
 **Privacy Note**: Debug logs are stored in memory only and contain:
+
 - Display IDs (numeric identifiers, no personal info)
 - Application names (masked by default since v1.2.8)
 - Window coordinates
@@ -343,12 +380,14 @@ No sensitive information is logged or transmitted.
 ## Roadmap
 
 ### In Progress (v1.2.14)
+
 - [ ] Launch at Login option (#42)
 - [x] **Pause/Lock feature** (#70) - Temporarily disable all functions during display input switching
 - [x] **Homebrew tap distribution** - `brew install --cask zembutsu/tsubame/tsubame`
 - [x] Fixed Slot 0 auto-snapshot consistency (#64)
 
 ### Completed (v1.2.13)
+
 - [x] Architecture refactoring (#47 Phase 2-4)
 - [x] Fixed AXUIElement position mismatch after long sleep (#50)
 - [x] Fixed monitoring flag not restored on wake (#54)
@@ -356,22 +395,26 @@ No sensitive information is logged or transmitted.
 - [x] Project documentation (ARCHITECTURE.md, PROJECT.md)
 
 ### Completed (v1.2.11)
+
 - [x] Menu hotkey display improvements (#48)
 - [x] Restored Sleep Behavior debug info in Settings (#48)
 - [x] Auto-snapshot skip during sleep fix (#48)
 - [x] App icon and README logo
 
 ### Completed (v1.2.10)
+
 - [x] Dead code cleanup (#45)
 - [x] Fixed double window restore on wake (#45)
 - [x] Production binary distribution via GitHub Releases (#3)
 
 ### Completed (v1.2.9)
+
 - [x] Fixed Accessibility API regression (#40)
 - [x] Default hotkey modifier fix (⌃⌘)
 - [x] Sound notifications disabled by default
 
 ### Completed (v1.2.8)
+
 - [x] Internationalization (English UI + Japanese localization) (#2)
 - [x] In-app language switcher
 - [x] All debug logs in English
@@ -386,6 +429,7 @@ No sensitive information is logged or transmitted.
 - [x] **TimerManager refactoring for better maintainability** (#28)
 
 ### Completed (v1.2.7)
+
 - [x] Changed default hotkey from ⌃⌥⌘ to ⌃⌘ (#5)
 - [x] Window size restoration (position + size)
 - [x] Restore on launch option
@@ -393,12 +437,14 @@ No sensitive information is logged or transmitted.
 - [x] Fixed floating-point display in logs
 
 ### Completed (v1.2.6)
+
 - [x] Privacy-aware window matching (SHA256 hashing for app names and titles)
 - [x] Window restoration after app restart (CGWindowID limitation fixed)
 - [x] Privacy protection mode (disable persistence option)
 - [x] Fallback matching strategy (title → size → app-only)
 
 ### Completed (v1.2.5)
+
 - [x] Fixed auto-snapshot false trigger after sleep/wake (#11)
 - [x] Display count protection for auto-snapshot
 - [x] Window restoration retry mechanism (#13)
@@ -406,6 +452,7 @@ No sensitive information is logged or transmitted.
 - [x] Debug log improvements for restoration failures
 
 ### Completed (v1.2.4)
+
 - [x] Automatic snapshot (initial + periodic)
 - [x] Persistent snapshot storage (UserDefaults)
 - [x] Auto-snapshot settings UI
@@ -421,30 +468,36 @@ No sensitive information is logged or transmitted.
 - [x] Automated version management (VERSION file + git commit count)
 
 ### Completed (v1.2.3)
+
 - [x] Manual window snapshot & restore (MVP)
 - [x] Save/restore hotkeys (Ctrl+Cmd+↑/↓)
 - [x] Menu bar integration for snapshot operations
 
 ### Completed (v1.2.2)
+
 - [x] Fixed stabilization timer reset issue during continuous display events
 - [x] Reliable window restoration after long sleep periods
 - [x] Debug log window refresh on each open
 
 ### Completed (v1.2.0)
+
 - [x] Two-stage display reconnection timing
 - [x] Configurable stabilization and restore delays
 - [x] Enhanced window position detection logic
 - [x] Debug log viewer with copy functionality
 
 ### Planned (v1.3.0 - Stable Release)
+
 - [ ] Stability improvements based on v1.2.x feedback
 - [ ] Documentation finalization
 
 ### Planned (v1.4.0 - Focus Follows Mouse)
+
 - [x] Focus Follows Mouse feature (#72)
 - [ ] Additional focus behavior options based on feedback
 
 ### Future Considerations
+
 - [ ] **App Store release** (#49) - Requires Sandbox/Accessibility API investigation
 - [ ] Custom slot naming UI
 - [ ] Spaces/virtual desktop auto-slot selection (#37)
@@ -461,6 +514,7 @@ For detailed development plans, see [CHANGELOG.md](CHANGELOG.md).
 Contributions are welcome! This project was created as a practical solution to a real problem, and maintained as a learning resource.
 
 ### Development Philosophy
+
 - **Simplicity First**: Resist feature creep
 - **Privacy Matters**: No telemetry, no cloud
 - **Readable Code**: Clear over clever
@@ -507,11 +561,13 @@ To developers who built their skills entirely through manual effort: I deeply re
 This project stands on the shoulders of giants and wouldn't exist without:
 
 **Inspiration & Prior Art**
+
 - The creators of [Rectangle](https://rectangleapp.com/) and [Magnet](https://magnet.crowdcafe.com/) for demonstrating excellent window management solutions
 - The broader macOS window management community for their innovative approaches
 - All open source contributors who share their knowledge and code
 
 **Development Support**
+
 - The macOS developer community for comprehensive documentation and helpful discussions
 - Apple's engineering teams for providing powerful APIs (Accessibility, CoreGraphics)
 
